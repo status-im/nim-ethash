@@ -1,4 +1,4 @@
-packageName   = "eth_keys"
+packageName   = "ethash"
 version       = "0.0.1"
 author        = "Status Research & Development GmbH"
 description   = "A reimplementation in pure Nim of ethash, the ethereum proof-of-work algorithm"
@@ -7,9 +7,9 @@ srcDir        = "src"
 
 ### Dependencies
 
-requires "nim >= 0.17.2", "number_theory", "keccak_tiny >= 0.1.0"
+requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0"
 
-proc test(name: string, lang: string = "cpp") =
+proc test(name: string, lang: string = "c") =
   if not dirExists "build":
     mkDir "build"
   if not dirExists "nimcache":

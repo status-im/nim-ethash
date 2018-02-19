@@ -58,10 +58,10 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
-  result[0] = sha3_512 seed
+  result[0] = keccak512 seed
 
   for i in 1 ..< n:
-    result[i] = sha3_512 result[i-1].toU512
+    result[i] = keccak512 result[i-1].toU512
 
   # Use a low-round version of randmemohash
   for _ in 0 ..< CACHE_ROUNDS:
@@ -70,14 +70,14 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
         v = result[i].toU512[0] mod n.uint
         a = result[(i-1+n) mod n].toU512
         b = result[v.int].toU512
-      result[i] = sha3_512 zipMap(a, b, x xor y)
+      result[i] = keccak512 zipMap(a, b, x xor y)
 
 # ###############################################################################
 # Data aggregation function
 
 const FNV_PRIME = 0x01000193
 
-proc fnv[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
+proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
 
   # Original formula is ((v1 * FNV_PRIME) xor v2) mod 2^32
   # However contrary to Python and depending on the type T,
@@ -91,9 +91,11 @@ proc fnv[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
   #   - for powers of 2: a mod 2^p == a and (2^p - 1)
   #   - 2^32 - 1 == high(uint32)
 
-  const mask: T = T(2^32) - 1
 
-  mulmod(v1 and mask, FNV_PRIME.T, (2^32).T) xor (v2 and mask)
+  # # mulmod(v1 and mask, FNV_PRIME.T, (2^32).T) xor (v2 and mask)
+  # Casting to uint32 should do the modulo and masking just fine
+
+  (v1.uint32 * FNV_PRIME) xor v2.uint32
 
 # ###############################################################################
 # Full dataset calculation
@@ -109,7 +111,7 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
     mix[0] = mix[0] xor i.uint64
   else:
     mix[high(mix)] = mix[high(0)] xor i.uint64
-  mix[] = toU512 sha3_512 mix[]
+  mix[] = toU512 keccak512 mix[]
 
   # FNV with a lots of random cache nodes based on i
   # TODO: we use FNV with word size 64 bit while ethash implementation is using 32 bit words
@@ -118,7 +120,7 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
     let cache_index = fnv(i.uint64 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))
 
-  result = sha3_512 mix[]
+  result = keccak512 mix[]
 
 proc calc_dataset(cache: var seq[Hash[512]]) {.noSideEffect.} =
   for i, hash in cache.mpairs:
@@ -127,7 +129,7 @@ proc calc_dataset(cache: var seq[Hash[512]]) {.noSideEffect.} =
 # ###############################################################################
 when isMainModule:
   echo get_full_size(100000)
-  let a = sha3_512 1234.toU512
+  let a = keccak512 1234.toU512
 
   echo a
 

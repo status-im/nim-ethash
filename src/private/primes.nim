@@ -4,8 +4,7 @@
 # Primality testing. TODO: a scalable implementation (i.e. Miller-Rabin)
 # See https://github.com/mratsim/nim-projecteuler/blob/master/src/lib/primes.nim
 
-import number_theory # Not on Nimble yet: https://github.com/numforge/number-theory
-
+import ./intmath
 
 proc isPrime*(x: SomeUnsignedInt): bool {.noSideEffect.}=
   for i in 2 .. isqrt x:

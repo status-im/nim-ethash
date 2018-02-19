@@ -66,14 +66,22 @@ proc hexToSeqBytesBE*(hexStr: string): seq[byte] {.noSideEffect.}=
     result[i] = hexStr[2*i].readHexChar shl 4 or hexStr[2*i+1].readHexChar
     inc(i)
 
-proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
-  ## Convert a big-endian byte-array to its hex representation
+proc toHex*[N: static[int]](ba: ByteArrayBE[N]): string {.noSideEffect.}=
+  ## Convert a big-endian byte array to its hex representation
   ## Output is in lowercase
   ##
-  ## Warning ⚠: Do not use toHex for hex representation of Public Keys
-  ##   Use the ``serialize`` proc:
-  ##     - PublicKey is actually 2 separate numbers corresponding to coordinate on elliptic curve
-  ##     - It is resistant against timing attack
+
+  const hexChars = "0123456789abcdef"
+
+  result = newString(2*N)
+  for i in 0 ..< N:
+    result[2*i] = hexChars[int ba[i] shr 4 and 0xF]
+    result[2*i+1] = hexChars[int ba[i] and 0xF]
+
+proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
+  ## Convert a big-endian byte sequence to its hex representation
+  ## Output is in lowercase
+  ##
 
   let N = ba.len
   const hexChars = "0123456789abcdef"
