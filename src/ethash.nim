@@ -6,6 +6,7 @@ import  math, sequtils,
         keccak_tiny
 
 import  ./private/[primes, casting, functional]
+export toHex, hexToSeqBytesBE
 
 # TODO: Switching from default int to uint64
 # Note: array/seq indexing requires an Ordinal, uint64 are not.
@@ -50,7 +51,7 @@ proc get_full_size(block_number: Natural): int {.noSideEffect.}=
 # ###############################################################################
 # Cache generation
 
-proc mkcache(cache_size, seed: int): seq[Hash[512]] {.noSideEffect.}=
+proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}=
 
   # The starting cache size is a set of 524288 64-byte values
 
@@ -58,7 +59,7 @@ proc mkcache(cache_size, seed: int): seq[Hash[512]] {.noSideEffect.}=
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
-  result[0] = sha3_512 seed.toU512 # TODO: spec is unclear how to hash i64/u64 integers
+  result[0] = sha3_512 seed
 
   for i in 1 ..< n:
     result[i] = sha3_512 result[i-1].toU512
@@ -112,11 +113,17 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
   mix[] = toU512 sha3_512 mix[]
 
   # FNV with a lots of random cache nodes based on i
+  # TODO: we use FNV with word size 64 bit while ethash implementation is using 32 bit words
+  #       tests needed
   for j in 0'u64 ..< DATASET_PARENTS:
     let cache_index = fnv(i.uint64 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))
 
   result = sha3_512 mix[]
+
+proc calc_dataset(cache: var seq[Hash[512]]) {.noSideEffect.} =
+  for i, hash in cache.mpairs:
+    hash = calc_dataset_item(cache, i)
 
 # ###############################################################################
 when isMainModule:
