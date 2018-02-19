@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import ../src/ethash, times
+import ../src/ethash, times, keccak_tiny
 
 
 let
@@ -23,4 +23,7 @@ var start = cpuTime() # Note for a multithreaded program, it adds the time taken
 # Cache   2^24
 
 let cache = mkcache(8209*4096, seed)
-echo cpuTime() - start
+echo "mkcache: ", cpuTime() - start, "s"
+
+let cache_hash = sha3_512 cache
+echo "sha3: ", $cache_hash

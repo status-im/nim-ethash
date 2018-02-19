@@ -68,9 +68,9 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
   for _ in 0 ..< CACHE_ROUNDS:
     for i in 0 ..< n:
       let
-        v = result[i].toU512[0].int mod n
+        v = result[i].toU512[0] mod n.uint
         a = result[(i-1+n) mod n].toU512
-        b = result[v].toU512
+        b = result[v.int].toU512
       result[i] = sha3_512 zipMap(a, b, x xor y)
 
 # ###############################################################################
