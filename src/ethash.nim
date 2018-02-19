@@ -105,10 +105,13 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
 
   # Initialize the mix, it's a reference to a cache item that we will modify in-place
   var mix = cast[ptr U512](unsafeAddr cache[i mod n])
-  mix[0] = mix[0] xor i.uint64        # This is probably broken on big endian
+  when system.cpuEndian == littleEndian:
+    mix[0] = mix[0] xor i.uint64
+  else:
+    mix[high(mix)] = mix[high(0)] xor i.uint64
   mix[] = toU512 sha3_512 mix[]
 
-  # FNV with a lots of random ache node based on i
+  # FNV with a lots of random cache nodes based on i
   for j in 0'u64 ..< DATASET_PARENTS:
     let cache_index = fnv(i.uint64 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))

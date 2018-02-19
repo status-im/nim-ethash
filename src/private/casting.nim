@@ -8,7 +8,10 @@ type U512* = array[8, uint64]
   ## and be able to do sha3_512 which only accepts arrays
 
 proc toU512*(x: Natural): U512 {.inline, noSideEffect.}=
-  result[result.high] = x.uint64
+  when system.cpuEndian == littleEndian:
+    result[0] = x.uint64
+  else:
+    result[result.high] = x.uint64
 
 proc toU512*(x: Hash[512]): U512 {.inline, noSideEffect, noInit.}=
   cast[type result](x)
