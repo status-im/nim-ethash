@@ -5,6 +5,7 @@ import  math, sequtils,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath]
+import ./data_sizes
 export toHex, hexToSeqBytesBE
 
 # TODO: Switching from default int to uint64
@@ -15,18 +16,22 @@ export toHex, hexToSeqBytesBE
 # Definitions
 
 const
-  WORD_BYTES = 8                    # bytes in word - in Nim we use 64 bits words
-  DATASET_BYTES_INIT = 2^30         # bytes in dataset at genesis
-  DATASET_BYTES_GROWTH = 2^23       # dataset growth per epoch
-  CACHE_BYTES_INIT = 2^24           # bytes in cache at genesis
-  CACHE_BYTES_GROWTH = 2^17         # cache growth per epoch
-  CACHE_MULTIPLIER=1024             # Size of the DAG relative to the cache
-  EPOCH_LENGTH = 30000              # blocks per epoch
-  MIX_BYTES = 128                   # width of mix
-  HASH_BYTES = 64                   # hash length in bytes
-  DATASET_PARENTS = 256             # number of parents of each dataset element
-  CACHE_ROUNDS = 3                  # number of rounds in cache production
-  ACCESSES = 64                     # number of accesses in hashimoto loop
+  REVISION* = 23                     # Based on spec revision 23
+  WORD_BYTES = 8                     # bytes in word - in Nim we use 64 bits words
+  DATASET_BYTES_INIT* = 2^30         # bytes in dataset at genesis
+  DATASET_BYTES_GROWTH* = 2^23       # dataset growth per epoch
+  CACHE_BYTES_INIT* = 2^24           # bytes in cache at genesis
+  CACHE_BYTES_GROWTH* = 2^17         # cache growth per epoch
+  CACHE_MULTIPLIER=1024              # Size of the DAG relative to the cache
+  EPOCH_LENGTH* = 30000              # blocks per epoch
+  MIX_BYTES* = 128                   # width of mix
+  HASH_BYTES* = 64                   # hash length in bytes
+  DATASET_PARENTS* = 256             # number of parents of each dataset element
+  CACHE_ROUNDS* = 3                  # number of rounds in cache production
+  ACCESSES* = 64                     # number of accesses in hashimoto loop
+
+  # MAGIC_NUM ?
+  # MAGIC_NUM_SIZE ?
 
 # ###############################################################################
 # Parameters
@@ -46,6 +51,15 @@ proc get_full_size(block_number: Natural): int {.noSideEffect.}=
   while (let dm = divmod(result, MIX_BYTES);
           dm.rem == 0 and dm.quot.isPrime):
     result -= 2 * MIX_BYTES
+
+# ###############################################################################
+# Fetch from lookup tables of 2048 epochs of data sizes and cache sizes
+
+proc get_datasize*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+  data_sizes[block_number div EPOCH_LENGTH]
+
+proc get_cachesize*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+  cache_sizes[block_number div EPOCH_LENGTH]
 
 # ###############################################################################
 # Cache generation
