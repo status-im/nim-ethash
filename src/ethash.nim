@@ -3,10 +3,9 @@
 
 import  math, sequtils,
         number_theory, # Not on nimble yet: https://github.com/numforge/number-theory
-        keccak_tiny,
-        zero_functional
+        keccak_tiny
 
-import  ./private/[primes, bytes]
+import  ./private/[primes, casting, functional]
 
 # TODO: Switching from default int to uint64
 # Note: array/seq indexing requires an Ordinal, uint64 are not.
@@ -16,7 +15,7 @@ import  ./private/[primes, bytes]
 # Definitions
 
 const
-  WORD_BYTES = 4                    # bytes in word
+  WORD_BYTES = 8                    # bytes in word - in Nim we use 64 bits words
   DATASET_BYTES_INIT = 2^30         # bytes in dataset at genesis
   DATASET_BYTES_GROWTH = 2^23       # dataset growth per epoch
   CACHE_BYTES_INIT = 2^24           # bytes in cache at genesis
@@ -53,30 +52,32 @@ proc get_full_size(block_number: Natural): int {.noSideEffect.}=
 
 proc mkcache(cache_size, seed: int): seq[Hash[512]] {.noSideEffect.}=
 
+  # The starting cache size is a set of 524288 64-byte values
+
   let n = cache_size div HASH_BYTES
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
-  result[0] = sha3_512 seed.asByteArray # TODO: spec is unclear if we interpret integers as array of bytes
+  result[0] = sha3_512 seed.toU512 # TODO: spec is unclear how to hash i64/u64 integers
 
   for i in 1 ..< n:
-    result[i] = sha3_512 result[i-1].asByteArray
+    result[i] = sha3_512 result[i-1].toU512
 
   # Use a low-round version of randmemohash
   for _ in 0 ..< CACHE_ROUNDS:
     for i in 0 ..< n:
       let
-        v = asByteArray(result[i])[0].int mod n
-        a = result[(i-1+n) mod n].asByteArray
-        b = result[v].asByteArray
-      result[i] = sha3_512 zip(a, b)-->map(it[0] xor it[1])
+        v = result[i].toU512[0].int mod n
+        a = result[(i-1+n) mod n].toU512
+        b = result[v].toU512
+      result[i] = sha3_512 zipMap(a, b, x xor y)
 
 # ###############################################################################
 # Data aggregation function
 
 const FNV_PRIME = 0x01000193
 
-proc fnv[T: SomeUnsignedInt or Natural](v1, v2: T): T =
+proc fnv[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
 
   # Original formula is ((v1 * FNV_PRIME) xor v2) mod 2^32
   # However contrary to Python and depending on the type T,
@@ -90,19 +91,36 @@ proc fnv[T: SomeUnsignedInt or Natural](v1, v2: T): T =
   #   - for powers of 2: a mod 2^p == a and (2^p - 1)
   #   - 2^32 - 1 == high(uint32)
 
-  const mask: T = 2^32 - 1
+  const mask: T = T(2^32) - 1
 
   mulmod(v1 and mask, FNV_PRIME.T, (2^32).T) xor (v2 and mask)
 
+# ###############################################################################
+# Full dataset calculation
+
+proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect.} =
+
+  let n = cache.len
+  const r = HASH_BYTES div WORD_BYTES
+
+  # Initialize the mix, it's a reference to a cache item that we will modify in-place
+  var mix = cast[ptr U512](unsafeAddr cache[i mod n])
+  mix[0] = mix[0] xor i.uint64        # This is probably broken on big endian
+  mix[] = toU512 sha3_512 mix[]
+
+  # FNV with a lots of random ache node based on i
+  for j in 0'u64 ..< DATASET_PARENTS:
+    let cache_index = fnv(i.uint64 xor j, mix[j mod r])
+    mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))
+
+  result = sha3_512 mix[]
 
 # ###############################################################################
 when isMainModule:
   echo get_full_size(100000)
-  let a = sha3_512 1234.asByteArray
+  let a = sha3_512 1234.toU512
 
   echo a
 
 
-  echo zip([0, 1, 2, 3], [10, 20, 30, 40]) --> map(it[0] * it[1]) # [0, 20, 60, 120]
-
-  echo zip(a.asByteArray, a.asByteArray) --> map(it[0] xor it[1])
+  echo zipMap([0, 1, 2, 3], [10, 20, 30, 40], x * y) # [0, 20, 60, 120]
