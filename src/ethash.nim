@@ -2,10 +2,9 @@
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import  math, sequtils,
-        number_theory, # Not on nimble yet: https://github.com/numforge/number-theory
         keccak_tiny
 
-import  ./private/[primes, casting, functional]
+import  ./private/[primes, casting, functional, intmath]
 export toHex, hexToSeqBytesBE
 
 # TODO: Switching from default int to uint64
