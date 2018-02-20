@@ -103,3 +103,6 @@ proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffec
     const N = T.sizeof
     for i in 0 ..< N:
       result[i] = byte(num shr uint((N-1-i) * 8))
+
+proc toByteArrayBE*(x: U512): ByteArrayBE[64] {.inline, noSideEffect, noInit.}=
+  cast[type result](x)

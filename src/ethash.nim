@@ -4,7 +4,7 @@
 import  math, sequtils, algorithm,
         keccak_tiny
 
-import  ./private/[primes, casting, functional, intmath]
+import  ./private/[primes, casting, functional, intmath, concat]
 import ./data_sizes
 export toHex, hexToSeqBytesBE
 
@@ -28,7 +28,7 @@ const
   HASH_BYTES* = 64                   # hash length in bytes
   DATASET_PARENTS* = 256             # number of parents of each dataset element
   CACHE_ROUNDS* = 3                  # number of rounds in cache production
-  ACCESSES* = 64'u32                     # number of accesses in hashimoto loop
+  ACCESSES* = 64                     # number of accesses in hashimoto loop
 
   # MAGIC_NUM ?
   # MAGIC_NUM_SIZE ?
@@ -149,32 +149,16 @@ proc calc_dataset(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.n
 # ###############################################################################
 # Main loop
 
-type HashimotoHash = tuple[mix_digest: Hash[512], result: Hash[256]]
-type DatasetLookup = proc(cache: seq[Hash[512]], i: Natural): Hash[512] {.nimcall, noSideEffect.}
+type HashimotoHash = tuple[mix_digest: array[4, uint32], result: Hash[256]]
+type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
-
-proc concat_hash(header: Hash[256], nonce: uint64): Hash[512] {.noSideEffect, inline, noInit.} =
-
-  # Can't take compile-time sizeof of arrays in objects: https://github.com/nim-lang/Nim/issues/5802
-  var cat{.noInit.}: array[256 div 8 + nonce.sizeof, byte]
-  let nonceBE = nonce.toByteArrayBE # Big endian representation of the number
-
-  # Concatenate hader and the big-endian nonce
-  for i, b in header.data:
-    cat[i] = b
-
-  for i, b in nonceBE:
-    cat[i + header.sizeof] = b
-
-  result = keccak512 cat
-
-proc initMix(s: Hash[512]): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
+proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
 
   # Create an array of size s copied (MIX_BYTES div HASH_BYTES) times
   # Array is flattened to uint32 words
 
   var mix: array[MIX_BYTES div HASH_BYTES, U512]
-  mix.fill(s.toU512)
+  mix.fill(s)
 
   result = cast[type result](mix)
 
@@ -182,22 +166,51 @@ proc hashimoto(header: Hash[256],
               nonce: uint64,
               fullsize: Natural,
               dataset_lookup: DatasetLookup
-              ): HashimotoHash =
+              ): HashimotoHash {.noInit, noSideEffect.}=
   let
-    n = full_size div HASH_BYTES # check div operator, in spec it's Python true division
-    w = MIX_BYTES div WORD_BYTES # TODO: review word bytes: uint32 vs uint64
-    mixhashes = MIX_BYTES div HASH_BYTES
+    n = uint32 full_size div HASH_BYTES # check div operator, in spec it's Python true division
+    w = uint32 MIX_BYTES div WORD_BYTES # TODO: review word bytes: uint32 vs uint64
+    mixhashes = uint32 MIX_BYTES div HASH_BYTES
     # combine header+nonce into a 64 byte seed
-    s = concat_hash(header, nonce)
+    s = concat_hash(header, nonce).toU512
 
   # start the mix with replicated s
   var mix = initMix(s)
 
   # mix in random dataset nodes
   for i in 0'u32 ..< ACCESSES:
-    discard
+    let p = fnv(i xor s[0], mix[i mod w]) mod (n div mixhashes) * mixhashes
+    var newdata{.noInit.}: type mix
+    for j in 0'u32 ..< MIX_BYTES div HASH_BYTES:
+      let dlu = dataset_lookup(p + j).toU512
+      for k, val in dlu:
+        newdata[j + k] = val
+      mix = zipMap(mix, newdata, fnv(x, y))
+
+  # compress mix (aka result.mix_digest)
+  for i in 0 ..< 4:
+    let idx = i*4
+    result.mix_digest[i] = mix[idx].fnv(mix[idx+1]).fnv(mix[idx+2]).fnv(mix[idx+3])
+
+  result.result = keccak256 concat_hash(s, result.mix_digest)
+
+
+proc hashimoto_light(full_size:Natural, cache: seq[Hash[512]],
+                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
+
+  let light: DatasetLookup = proc(x: Natural): Hash[512] = calc_data_set_item(cache, x)
+  hashimoto(header,
+            nonce,
+            full_size,
+            light)
+
+proc hashimoto_light(full_size:Natural, dataset: seq[Hash[512]],
+                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
+
+  let full: DatasetLookup = proc(x: Natural): Hash[512] = dataset[x]
+  hashimoto(header,
+            nonce,
+            full_size,
+            full)
 
 # ###############################################################################
-
-when isMainModule:
-  echo "calc_data_set_item is DatasetLookup: " & $(calc_dataset_item is DatasetLookup)
