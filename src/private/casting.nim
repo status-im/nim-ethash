@@ -3,22 +3,22 @@
 
 import keccak_tiny
 
-type U512* = array[8, uint64]
+type U512* = array[16, uint32]
   ## A very simple type alias to `xor` Hash[512] with normal integers
   ## and be able to do sha3_512 which only accepts arrays
 
 proc toU512*(x: Natural): U512 {.inline, noSideEffect.}=
   when system.cpuEndian == littleEndian:
-    result[0] = x.uint64
+    result[0] = x.uint32
   else:
-    result[result.high] = x.uint64
+    result[result.high] = x.uint32
 
 proc toU512*(x: Hash[512]): U512 {.inline, noSideEffect, noInit.}=
   cast[type result](x)
 
 proc `xor`*(x, y: U512): U512 {.inline, noSideEffect, noInit.}=
   for i in 0 ..< result.len:
-    {.unroll: 8.}
+    {.unroll: 4.}
     result[i] = x[i] xor y[i]
 
 proc toHash512*(x: U512): Hash[512] {.inline, noSideEffect, noInit.}=
@@ -39,7 +39,6 @@ proc readHexChar(c: char): byte {.noSideEffect.}=
   of 'A'..'F': result = byte(ord(c) - ord('A') + 10)
   else:
     raise newException(ValueError, $c & "is not a hexademical character")
-
 
 proc hexToByteArrayBE*[N: static[int]](hexStr: string): ByteArrayBE[N] {.noSideEffect, noInit.}=
   ## Read an hex string and store it in a Byte Array in Big-Endian order
@@ -91,3 +90,16 @@ proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
     # you can index an array with byte/uint8 but not a seq :/
     result[2*i] = hexChars[int ba[i] shr 4 and 0xF]
     result[2*i+1] = hexChars[int ba[i] and 0xF]
+
+proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffect, noInit, inline.}=
+  ## Convert an UInt256 (in native host endianness) to a big-endian byte array
+  # Note: only works on devel
+
+  when system.cpuEndian == bigEndian:
+    cast[type result](num)
+  else:
+    # Theoretically this works for both big or little endian
+    # but in case of bigEndian, casting is much faster.
+    const N = T.sizeof
+    for i in 0 ..< N:
+      result[i] = byte(num shr uint((N-1-i) * 8))

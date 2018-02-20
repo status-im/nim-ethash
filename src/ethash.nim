@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import  math, sequtils,
+import  math, sequtils, algorithm,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath]
@@ -17,7 +17,7 @@ export toHex, hexToSeqBytesBE
 
 const
   REVISION* = 23                     # Based on spec revision 23
-  WORD_BYTES = 8                     # bytes in word - in Nim we use 64 bits words
+  WORD_BYTES = 4                     # bytes in word - in Nim we use 64 bits words # TODO check that
   DATASET_BYTES_INIT* = 2^30         # bytes in dataset at genesis
   DATASET_BYTES_GROWTH* = 2^23       # dataset growth per epoch
   CACHE_BYTES_INIT* = 2^24           # bytes in cache at genesis
@@ -28,7 +28,7 @@ const
   HASH_BYTES* = 64                   # hash length in bytes
   DATASET_PARENTS* = 256             # number of parents of each dataset element
   CACHE_ROUNDS* = 3                  # number of rounds in cache production
-  ACCESSES* = 64                     # number of accesses in hashimoto loop
+  ACCESSES* = 64'u32                     # number of accesses in hashimoto loop
 
   # MAGIC_NUM ?
   # MAGIC_NUM_SIZE ?
@@ -36,20 +36,20 @@ const
 # ###############################################################################
 # Parameters
 
-proc get_cache_size(block_number: Natural): int {.noSideEffect.}=
+proc get_cache_size(block_number: Natural): Natural {.noSideEffect.}=
   result = CACHE_BYTES_INIT + CACHE_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= HASH_BYTES
   while (let dm = divmod(result, HASH_BYTES);
-          dm.rem == 0 and dm.quot.isPrime):
+        dm.rem == 0 and dm.quot.isPrime):
         # In a static lang, checking that the result of a division is prime
         # Means checking that reminder == 0 and quotient is prime
     result -= 2 * HASH_BYTES
 
-proc get_full_size(block_number: Natural): int {.noSideEffect.}=
+proc get_full_size(block_number: Natural): Natural {.noSideEffect.}=
   result = DATASET_BYTES_INIT + DATASET_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= MIX_BYTES
   while (let dm = divmod(result, MIX_BYTES);
-          dm.rem == 0 and dm.quot.isPrime):
+        dm.rem == 0 and dm.quot.isPrime):
     result -= 2 * MIX_BYTES
 
 # ###############################################################################
@@ -81,7 +81,7 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
   for _ in 0 ..< CACHE_ROUNDS:
     for i in 0 ..< n:
       let
-        v = result[i].toU512[0] mod n.uint
+        v = result[i].toU512[0] mod n.uint32
         a = result[(i-1+n) mod n].toU512
         b = result[v.int].toU512
       result[i] = keccak512 zipMap(a, b, x xor y)
@@ -91,7 +91,7 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
 
 const FNV_PRIME = 0x01000193
 
-proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
+proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffect.}=
 
   # Original formula is ((v1 * FNV_PRIME) xor v2) mod 2^32
   # However contrary to Python and depending on the type T,
@@ -114,7 +114,10 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): T {.inline, noSideEffect.}=
 # ###############################################################################
 # Full dataset calculation
 
-proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect.} =
+proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
+  # TODO review WORD_BYTES
+  # TODO use uint32 instead of uint64
+  # and mix[0] should be uint32
 
   let n = cache.len
   const r = HASH_BYTES div WORD_BYTES
@@ -122,30 +125,79 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
   # Initialize the mix, it's a reference to a cache item that we will modify in-place
   var mix = cast[ptr U512](unsafeAddr cache[i mod n])
   when system.cpuEndian == littleEndian:
-    mix[0] = mix[0] xor i.uint64
+    mix[0] = mix[0] xor i.uint32
   else:
-    mix[high(mix)] = mix[high(0)] xor i.uint64
+    mix[high(mix)] = mix[high(0)] xor i.uint32
   mix[] = toU512 keccak512 mix[]
 
   # FNV with a lots of random cache nodes based on i
   # TODO: we use FNV with word size 64 bit while ethash implementation is using 32 bit words
   #       tests needed
-  for j in 0'u64 ..< DATASET_PARENTS:
-    let cache_index = fnv(i.uint64 xor j, mix[j mod r])
+  for j in 0'u32 ..< DATASET_PARENTS:
+    let cache_index = fnv(i.uint32 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))
 
   result = keccak512 mix[]
 
-proc calc_dataset(cache: var seq[Hash[512]]) {.noSideEffect.} =
-  for i, hash in cache.mpairs:
+proc calc_dataset(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
+
+  result = newSeq[Hash[512]](full_size div HASH_BYTES)
+
+  for i, hash in result.mpairs:
     hash = calc_dataset_item(cache, i)
 
 # ###############################################################################
+# Main loop
+
+type HashimotoHash = tuple[mix_digest: Hash[512], result: Hash[256]]
+type DatasetLookup = proc(cache: seq[Hash[512]], i: Natural): Hash[512] {.nimcall, noSideEffect.}
+
+
+proc concat_hash(header: Hash[256], nonce: uint64): Hash[512] {.noSideEffect, inline, noInit.} =
+
+  # Can't take compile-time sizeof of arrays in objects: https://github.com/nim-lang/Nim/issues/5802
+  var cat{.noInit.}: array[256 div 8 + nonce.sizeof, byte]
+  let nonceBE = nonce.toByteArrayBE # Big endian representation of the number
+
+  # Concatenate hader and the big-endian nonce
+  for i, b in header.data:
+    cat[i] = b
+
+  for i, b in nonceBE:
+    cat[i + header.sizeof] = b
+
+  result = keccak512 cat
+
+proc initMix(s: Hash[512]): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
+
+  # Create an array of size s copied (MIX_BYTES div HASH_BYTES) times
+  # Array is flattened to uint32 words
+
+  var mix: array[MIX_BYTES div HASH_BYTES, U512]
+  mix.fill(s.toU512)
+
+  result = cast[type result](mix)
+
+proc hashimoto(header: Hash[256],
+              nonce: uint64,
+              fullsize: Natural,
+              dataset_lookup: DatasetLookup
+              ): HashimotoHash =
+  let
+    n = full_size div HASH_BYTES # check div operator, in spec it's Python true division
+    w = MIX_BYTES div WORD_BYTES # TODO: review word bytes: uint32 vs uint64
+    mixhashes = MIX_BYTES div HASH_BYTES
+    # combine header+nonce into a 64 byte seed
+    s = concat_hash(header, nonce)
+
+  # start the mix with replicated s
+  var mix = initMix(s)
+
+  # mix in random dataset nodes
+  for i in 0'u32 ..< ACCESSES:
+    discard
+
+# ###############################################################################
+
 when isMainModule:
-  echo get_full_size(100000)
-  let a = keccak512 1234.toU512
-
-  echo a
-
-
-  echo zipMap([0, 1, 2, 3], [10, 20, 30, 40], x * y) # [0, 20, 60, 120]
+  echo "calc_data_set_item is DatasetLookup: " & $(calc_dataset_item is DatasetLookup)
