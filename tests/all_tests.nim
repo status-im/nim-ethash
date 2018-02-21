@@ -142,21 +142,32 @@ suite "Seed hash":
       expected = keccak_256(expected.toByteArrayBE)
 
 suite "Dagger hashimoto computation":
+    # We can't replicate Python's dynamic typing here
+    # As Nim expects stack allocated Hash and a string is allocated on the heap
+
+  let
+    cache_size = 1024'u
+    full_size  = 1024'u * 32
+    cache_str = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    header_str = "~~~~~X~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+  var cache_hash: Hash[256]
+  copyMem(addr cache_hash, unsafeAddr cache_str[0], 256 div 8)
+  let cache = mkcache(cache_size, cache_hash)
+
+  var header: Hash[256]
+  copyMem(addr header, unsafeAddr header_str[0], 256 div 8)
+
+  test "calc_data_set_item of item 0":
+    # # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L350-L374
+    let expected = toUpperASCII "b1698f829f90b35455804e5185d78f549fcb1bdce2bee006d4d7e68eb154b596be1427769eb1c3c3e93180c760af75f81d1023da6a0ffbe321c153a7c0103597"
+
+    check: $calc_dataset_item(cache, 0) == expected
+
   test "Light and full Hashimoto agree":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/python/test_pyethash.py#L44-L58
 
-    # We can't replicate Python's dynamic typing here
-    # As Nim expects stack allocated Hash and a string is allocated on the heap
-    let cache_str = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    var cache_hash: Hash[256]
-    copyMem(addr cache_hash, unsafeAddr cache_str[0], 256 div 8)
-    let cache = mkcache(1024, cache_hash)
 
-    let full_size = 1024 * 32
-
-    let header_str = "~~~~~X~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    var header: Hash[256]
-    copyMem(addr header, unsafeAddr header_str[0], 256 div 8)
 
     let
       light_result = hashimoto_light(full_size, cache, header, 0)

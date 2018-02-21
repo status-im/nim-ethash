@@ -114,7 +114,7 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
 # ###############################################################################
 # Full dataset calculation
 
-proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
+proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
   # TODO review WORD_BYTES
   # TODO use uint32 instead of uint64
   # and mix[0] should be uint32
