@@ -106,3 +106,6 @@ proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffec
 
 proc toByteArrayBE*(x: U512): ByteArrayBE[64] {.inline, noSideEffect, noInit.}=
   cast[type result](x)
+
+proc toByteArrayBE*[N: static[int]](x: Hash[N]): ByteArrayBE[N div 8] {.inline, noSideEffect, noInit.}=
+  cast[type result](x)

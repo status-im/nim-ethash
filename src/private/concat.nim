@@ -20,7 +20,7 @@ proc concat_hash*(header: Hash[256], nonce: uint64): Hash[512] {.noSideEffect, i
   result = keccak512 cat
 
 
-proc concat_hash*(s: U512, cmix: array[4, uint32]): array[(512 + 4 * 32) div 8, byte] {.noSideEffect, inline, noInit.} =
+proc concat_hash*(s: U512, cmix: array[8, uint32]): array[(512 + 8 * 32) div 8, byte] {.noSideEffect, inline, noInit.} =
 
 
   # TODO: Do we need to convert cmix to Big Endian??
@@ -31,4 +31,4 @@ proc concat_hash*(s: U512, cmix: array[4, uint32]): array[(512 + 4 * 32) div 8, 
 
   for i, b in cmix:
     let offset = s.sizeof + i
-    result[offset ..< offset + 4] = cast[array[4, byte]](b)
+    result[offset ..< offset + 4] = cast[array[8, byte]](b)

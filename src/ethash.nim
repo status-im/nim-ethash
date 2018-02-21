@@ -5,7 +5,7 @@ import  math, sequtils, algorithm,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath, concat]
-export toHex, hexToSeqBytesBE
+export toHex, hexToSeqBytesBE, toByteArrayBE
 
 # TODO: Switching from default int to uint64
 # Note: array/seq indexing requires an Ordinal, uint64 are not.
@@ -64,7 +64,7 @@ proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} 
 # ###############################################################################
 # Cache generation
 
-proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}=
+proc mkcache*(cache_size: int, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
 
   # The starting cache size is a set of 524288 64-byte values
 
@@ -72,7 +72,7 @@ proc mkcache*(cache_size: int, seed: seq[byte]): seq[Hash[512]] {.noSideEffect.}
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
-  result[0] = keccak512 seed
+  result[0] = keccak512 seed.toByteArrayBE
 
   for i in 1 ..< n:
     result[i] = keccak512 result[i-1].toU512
@@ -149,7 +149,7 @@ proc calc_dataset(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.n
 # ###############################################################################
 # Main loop
 
-type HashimotoHash = tuple[mix_digest: array[4, uint32], result: Hash[256]]
+type HashimotoHash = tuple[mix_digest: array[8, uint32], value: Hash[256]]
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
 proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
@@ -192,7 +192,7 @@ proc hashimoto(header: Hash[256],
     let idx = i*4
     result.mix_digest[i] = mix[idx].fnv(mix[idx+1]).fnv(mix[idx+2]).fnv(mix[idx+3])
 
-  result.result = keccak256 concat_hash(s, result.mix_digest)
+  result.value = keccak256 concat_hash(s, result.mix_digest)
 
 
 proc hashimoto_light(full_size:Natural, cache: seq[Hash[512]],
@@ -214,3 +214,8 @@ proc hashimoto_full(full_size:Natural, dataset: seq[Hash[512]],
             full)
 
 # ###############################################################################
+# Defining the seed hash
+
+proc get_seedhash*(block_number: uint32): Hash[256] {.noSideEffect.} =
+  for i in 0'u32 ..< block_number div EPOCH_LENGTH:
+    result = keccak256 result.toByteArrayBE
