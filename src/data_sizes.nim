@@ -3,6 +3,23 @@
 
 # ETHASH Data sizes lookup tables
 
+## 2048 Epochs (~20 years) worth of tabulated DAG sizes
+##
+## Generated with the following Mathematica Code:
+##
+## GetCacheSizes[n_] := Module[{
+##        CacheSizeBytesInit = 2^24,
+##        CacheGrowth = 2^17,
+##        HashBytes = 64,
+##        j = 0},
+##       Reap[
+##         While[j < n,
+##           Module[{i =
+##             Floor[(CacheSizeBytesInit + CacheGrowth * j) / HashBytes]},
+##             While[! PrimeQ[i], i--];
+##             Sow[i*HashBytes]; j++]]]][[2]][[1]]
+
+
 const
   data_sizes* = [
     1073739904'u, 1082130304'u, 1090514816'u, 1098906752'u, 1107293056'u,
@@ -415,6 +432,22 @@ const
     18144558976'u, 18152947328'u, 18161336192'u, 18169724288'u, 18178108544'u,
     18186498944'u, 18194886784'u, 18203275648'u, 18211666048'u, 18220048768'u,
     18228444544'u, 18236833408'u, 18245220736'u]
+
+  ## Generated with the following Mathematica Code:
+  ##
+  ## GetCacheSizes[n_] := Module[{
+  ##         DataSetSizeBytesInit = 2^30,
+  ##         MixBytes = 128,
+  ##         DataSetGrowth = 2^23,
+  ##         HashBytes = 64,
+  ##         CacheMultiplier = 1024,
+  ##         j = 0},
+  ##     Reap[
+  ##       While[j < n,
+  ##        Module[{i = Floor[(DataSetSizeBytesInit + DataSetGrowth * j) / (CacheMultiplier * HashBytes)]},
+  ##         While[! PrimeQ[i], i--];
+  ##         Sow[i*HashBytes]; j++]]]][[2]][[1]]
+
 
   cache_sizes* = [uint 16776896, 16907456, 17039296, 17170112, 17301056, 17432512, 17563072,
   17693888, 17824192, 17955904, 18087488, 18218176, 18349504, 18481088,

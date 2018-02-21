@@ -44,8 +44,8 @@ suite "Endianness (not implemented)":
 
 suite "Genesis parameters":
   let
-    full_size = get_datasize(0).int
-    cache_size = get_cachesize(0).int
+    full_size = get_datasize(0)
+    cache_size = get_cachesize(0)
 
   test "Full dataset size should be less or equal DATASET_BYTES_INIT":
     check: full_size <= DATASET_BYTES_INIT
@@ -61,3 +61,33 @@ suite "Genesis parameters":
 
   test "Cache size == 16776896":
     check: cache_size == 16776896
+
+  test "Full dataset size at the change of epochs":
+    check: get_data_size(EPOCH_LENGTH - 1) == 1073739904'u
+    check: get_data_size(EPOCH_LENGTH)     == 1082130304'u
+    check: get_data_size(EPOCH_LENGTH + 1) == 1082130304'u
+    check: get_data_size(EPOCH_LENGTH * 2046) == 18236833408'u
+    check: get_data_size(EPOCH_LENGTH * 2047) == 18245220736'u
+
+  test "Cache size at the change of epochs":
+    check: get_cache_size(EPOCH_LENGTH - 1) == 16776896'u
+    check: get_cache_size(EPOCH_LENGTH)     == 16907456'u
+    check: get_cache_size(EPOCH_LENGTH + 1) == 16907456'u
+    check: get_cache_size(EPOCH_LENGTH * 2046) == 284950208'u
+    check: get_cache_size(EPOCH_LENGTH * 2047) == 285081536'u
+    check: get_cache_size(EPOCH_LENGTH * 2048 - 1) == 285081536'u
+
+  test "Full dataset size at the change of epochs - Look-up tables":
+    check: get_data_size_lut(EPOCH_LENGTH - 1) == 1073739904'u
+    check: get_data_size_lut(EPOCH_LENGTH)     == 1082130304'u
+    check: get_data_size_lut(EPOCH_LENGTH + 1) == 1082130304'u
+    check: get_data_size_lut(EPOCH_LENGTH * 2046) == 18236833408'u
+    check: get_data_size_lut(EPOCH_LENGTH * 2047) == 18245220736'u
+
+  test "Cache size at the change of epochs - Look-up tables":
+    check: get_cache_size_lut(EPOCH_LENGTH - 1) == 16776896'u
+    check: get_cache_size_lut(EPOCH_LENGTH)     == 16907456'u
+    check: get_cache_size_lut(EPOCH_LENGTH + 1) == 16907456'u
+    check: get_cache_size_lut(EPOCH_LENGTH * 2046) == 284950208'u
+    check: get_cache_size_lut(EPOCH_LENGTH * 2047) == 285081536'u
+    check: get_cache_size_lut(EPOCH_LENGTH * 2048 - 1) == 285081536'u

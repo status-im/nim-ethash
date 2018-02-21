@@ -5,7 +5,6 @@ import  math, sequtils, algorithm,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath, concat]
-import ./data_sizes
 export toHex, hexToSeqBytesBE
 
 # TODO: Switching from default int to uint64
@@ -18,10 +17,10 @@ export toHex, hexToSeqBytesBE
 const
   REVISION* = 23                     # Based on spec revision 23
   WORD_BYTES = 4                     # bytes in word - in Nim we use 64 bits words # TODO check that
-  DATASET_BYTES_INIT* = 2^30         # bytes in dataset at genesis
-  DATASET_BYTES_GROWTH* = 2^23       # dataset growth per epoch
-  CACHE_BYTES_INIT* = 2^24           # bytes in cache at genesis
-  CACHE_BYTES_GROWTH* = 2^17         # cache growth per epoch
+  DATASET_BYTES_INIT* = 2'u^30       # bytes in dataset at genesis
+  DATASET_BYTES_GROWTH* = 2'u^23     # dataset growth per epoch
+  CACHE_BYTES_INIT* = 2'u^24         # bytes in cache at genesis
+  CACHE_BYTES_GROWTH* = 2'u^17       # cache growth per epoch
   CACHE_MULTIPLIER=1024              # Size of the DAG relative to the cache
   EPOCH_LENGTH* = 30000              # blocks per epoch
   MIX_BYTES* = 128                   # width of mix
@@ -36,29 +35,30 @@ const
 # ###############################################################################
 # Parameters
 
-proc get_cache_size(block_number: Natural): Natural {.noSideEffect.}=
+proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
   result = CACHE_BYTES_INIT + CACHE_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= HASH_BYTES
   while (let dm = divmod(result, HASH_BYTES);
-        dm.rem == 0 and dm.quot.isPrime):
+        dm.rem == 0 and not dm.quot.isPrime):
         # In a static lang, checking that the result of a division is prime
         # Means checking that reminder == 0 and quotient is prime
     result -= 2 * HASH_BYTES
 
-proc get_full_size(block_number: Natural): Natural {.noSideEffect.}=
+proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
   result = DATASET_BYTES_INIT + DATASET_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= MIX_BYTES
   while (let dm = divmod(result, MIX_BYTES);
-        dm.rem == 0 and dm.quot.isPrime):
+        dm.rem == 0 and not dm.quot.isPrime):
     result -= 2 * MIX_BYTES
 
 # ###############################################################################
 # Fetch from lookup tables of 2048 epochs of data sizes and cache sizes
+import ./data_sizes
 
-proc get_datasize*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+proc get_datasize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} =
   data_sizes[block_number div EPOCH_LENGTH]
 
-proc get_cachesize*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} =
   cache_sizes[block_number div EPOCH_LENGTH]
 
 # ###############################################################################
@@ -204,7 +204,7 @@ proc hashimoto_light(full_size:Natural, cache: seq[Hash[512]],
             full_size,
             light)
 
-proc hashimoto_light(full_size:Natural, dataset: seq[Hash[512]],
+proc hashimoto_full(full_size:Natural, dataset: seq[Hash[512]],
                     header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
 
   let full: DatasetLookup = proc(x: Natural): Hash[512] = dataset[x]
