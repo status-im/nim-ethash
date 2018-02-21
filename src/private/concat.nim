@@ -31,4 +31,4 @@ proc concat_hash*(s: U512, cmix: array[8, uint32]): array[(512 + 8 * 32) div 8, 
 
   for i, b in cmix:
     let offset = s.sizeof + i
-    result[offset ..< offset + 4] = cast[array[8, byte]](b)
+    result[offset ..< offset + 8] = cast[array[8, byte]](b)

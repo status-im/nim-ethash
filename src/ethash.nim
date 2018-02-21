@@ -64,11 +64,11 @@ proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} 
 # ###############################################################################
 # Cache generation
 
-proc mkcache*(cache_size: int, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
+proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
 
   # The starting cache size is a set of 524288 64-byte values
 
-  let n = cache_size div HASH_BYTES
+  let n = int(cache_size div HASH_BYTES)
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
@@ -164,7 +164,7 @@ proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.no
 
 proc hashimoto(header: Hash[256],
               nonce: uint64,
-              fullsize: Natural,
+              full_size: Natural,
               dataset_lookup: DatasetLookup
               ): HashimotoHash {.noInit, noSideEffect.}=
   let
@@ -195,8 +195,8 @@ proc hashimoto(header: Hash[256],
   result.value = keccak256 concat_hash(s, result.mix_digest)
 
 
-proc hashimoto_light(full_size:Natural, cache: seq[Hash[512]],
-                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
+proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
+                      header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
 
   let light: DatasetLookup = proc(x: Natural): Hash[512] = calc_data_set_item(cache, x)
   hashimoto(header,
@@ -204,7 +204,7 @@ proc hashimoto_light(full_size:Natural, cache: seq[Hash[512]],
             full_size,
             light)
 
-proc hashimoto_full(full_size:Natural, dataset: seq[Hash[512]],
+proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
                     header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
 
   let full: DatasetLookup = proc(x: Natural): Hash[512] = dataset[x]
@@ -216,6 +216,7 @@ proc hashimoto_full(full_size:Natural, dataset: seq[Hash[512]],
 # ###############################################################################
 # Defining the seed hash
 
-proc get_seedhash*(block_number: uint32): Hash[256] {.noSideEffect.} =
-  for i in 0'u32 ..< block_number div EPOCH_LENGTH:
+proc get_seedhash*(block_number: uint64): Hash[256] {.noSideEffect.} =
+  # uint64 are not Ordinal :/
+  for i in 0 ..< int(block_number div EPOCH_LENGTH):
     result = keccak256 result.toByteArrayBE

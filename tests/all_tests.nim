@@ -109,7 +109,7 @@ suite "Seed hash":
       check: get_seedhash(i) == expected
       expected = keccak_256(expected.toByteArrayBE)
 
-suite "[Not Implemented] Dagger hashimoto computation":
+suite "Dagger hashimoto computation":
   test "Light compute":
     # Taken from https://github.com/paritytech/parity/blob/05f47b635951f942b493747ca3bc71de90a95d5d/ethash/src/compute.rs#L372-L394
 
@@ -133,3 +133,14 @@ suite "[Not Implemented] Dagger hashimoto computation":
 
     let nonce = 0xd7b3ac70a301a249'u64
     ## difficulty = 0x085657254bd9u64
+    let blk = 486382'u # block number
+    let light_cache = mkcache(blk.get_cache_size, blk.get_seedhash)
+
+    let r = hashimoto_light(blk.get_data_size,
+                            light_cache,
+                            blk.get_seedhash,
+                            nonce
+    )
+
+    check: r.mix_digest == expected_mix_hash
+    check: r.value      == expected_boundary
