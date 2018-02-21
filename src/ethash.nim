@@ -139,7 +139,7 @@ proc calc_dataset_item(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEff
 
   result = keccak512 mix[]
 
-proc calc_dataset(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
+proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
 
   result = newSeq[Hash[512]](full_size div HASH_BYTES)
 
@@ -150,6 +150,7 @@ proc calc_dataset(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.n
 # Main loop
 
 type HashimotoHash = tuple[mix_digest: array[8, uint32], value: Hash[256]]
+  # TODO use Hash as a result type
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
 proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
@@ -206,7 +207,7 @@ proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
 
 proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
                     header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
-
+  # TODO spec mentions full_size but I don't think we need it (retrieve it from dataset.len)
   let full: DatasetLookup = proc(x: Natural): Hash[512] = dataset[x]
   hashimoto(header,
             nonce,
