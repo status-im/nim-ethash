@@ -120,24 +120,21 @@ proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEf
   # and mix[0] should be uint32
 
   let n = cache.len
-  const r = HASH_BYTES div WORD_BYTES
+  const r: uint32 = HASH_BYTES div WORD_BYTES
 
-  # Initialize the mix, it's a reference to a cache item that we will modify in-place
-  var mix = cast[ptr U512](unsafeAddr cache[i mod n])
+  var mix = cast[U512](cache[i mod n])
   when system.cpuEndian == littleEndian:
     mix[0] = mix[0] xor i.uint32
   else:
     mix[high(mix)] = mix[high(0)] xor i.uint32
-  mix[] = toU512 keccak512 mix[]
+  mix = toU512 keccak512 mix
 
   # FNV with a lots of random cache nodes based on i
-  # TODO: we use FNV with word size 64 bit while ethash implementation is using 32 bit words
-  #       tests needed
   for j in 0'u32 ..< DATASET_PARENTS:
     let cache_index = fnv(i.uint32 xor j, mix[j mod r])
-    mix[] = zipMap(mix[], cache[cache_index.int mod n].toU512, fnv(x, y))
+    mix = zipMap(mix, cache[cache_index.int mod n].toU512, fnv(x, y))
 
-  result = keccak512 mix[]
+  result = keccak512 mix
 
 proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
 
