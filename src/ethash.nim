@@ -150,15 +150,14 @@ type HashimotoHash = tuple[mix_digest: array[8, uint32], value: Hash[256]]
   # TODO use Hash as a result type
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
-proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 512 div 32, uint32] {.noInit, noSideEffect,inline.}=
+proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 16, uint32] {.noInit,noSideEffect,inline.}=
 
   # Create an array of size s copied (MIX_BYTES div HASH_BYTES) times
   # Array is flattened to uint32 words
+  # It should be 32 * uint32 = 2 * Hash[512]
 
-  var mix: array[MIX_BYTES div HASH_BYTES, U512]
-  mix.fill(s)
-
-  result = cast[type result](mix)
+  result[0..<16] = s
+  result[16..<32] = s
 
 proc hashimoto(header: Hash[256],
               nonce: uint64,
@@ -173,17 +172,20 @@ proc hashimoto(header: Hash[256],
     s = concat_hash(header, nonce).toU512
 
   # start the mix with replicated s
-  var mix = initMix(s)
+  var mix{.noInit.}: array[32, uint32] # MIX_BYTES / HASH_BYTES * sizeof(s) => 1024
+  mix[0..<16] = s
+  mix[16..<32] = s
 
   # mix in random dataset nodes
   for i in 0'u32 ..< ACCESSES:
-    let p = fnv(i xor s[0], mix[i mod w]) mod (n div mixhashes) * mixhashes
+    let p = fnv(i.uint32 xor s[0].uint32, mix[i mod w]) mod (n div mixhashes) * mixhashes
+
+    # Unrolled: for j in range(MIX_BYTES / HASH_BYTES): => for j in 0 ..< 2
     var newdata{.noInit.}: type mix
-    for j in 0'u32 ..< MIX_BYTES div HASH_BYTES:
-      let dlu = dataset_lookup(p + j).toU512
-      for k, val in dlu:
-        newdata[j + k] = val
-      mix = zipMap(mix, newdata, fnv(x, y))
+    newdata[0..<16] = cast[array[16, uint32]](dataset_lookup(p))
+    newdata[16..<32] = cast[array[16, uint32]](dataset_lookup(p+1))
+
+    mix = zipMap(mix, newdata, fnv(x, y))
 
   # compress mix (aka result.mix_digest)
   for i in 0 ..< 4:
