@@ -23,12 +23,13 @@ proc concat_hash*(header: Hash[256], nonce: uint64): Hash[512] {.noSideEffect, i
 proc concat_hash*(s: U512, cmix: array[8, uint32]): array[(512 + 8 * 32) div 8, byte] {.noSideEffect, inline, noInit.} =
 
 
-  # TODO: Do we need to convert cmix to Big Endian??
-
   # Concatenate header and the big-endian nonce
-  for i, b in s.toByteArrayBE:
+  let sb = s.toByteArrayBE
+  for i, b in sb:
     result[i] = b
 
-  for i, b in cmix:
-    let offset = s.sizeof + i
-    result[offset ..< offset + 8] = cast[array[8, byte]](b)
+  # TODO: Do we need to convert cmix to Big Endian??
+  let cmixb = cast[ByteArrayBE[32]](cmix)
+  for i, b in cmixb:
+    let offset = sb.len + i
+    result[offset] = b

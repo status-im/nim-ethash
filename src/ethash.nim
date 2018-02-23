@@ -5,7 +5,8 @@ import  math, sequtils, algorithm,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath, concat]
-export toHex, hexToSeqBytesBE, toByteArrayBE
+export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE
+export keccak_tiny
 
 # TODO: Switching from default int to uint64
 # Note: array/seq indexing requires an Ordinal, uint64 are not.
@@ -150,15 +151,6 @@ type HashimotoHash = tuple[mix_digest: array[8, uint32], value: Hash[256]]
   # TODO use Hash as a result type
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
-proc initMix(s: U512): array[MIX_BYTES div HASH_BYTES * 16, uint32] {.noInit,noSideEffect,inline.}=
-
-  # Create an array of size s copied (MIX_BYTES div HASH_BYTES) times
-  # Array is flattened to uint32 words
-  # It should be 32 * uint32 = 2 * Hash[512]
-
-  result[0..<16] = s
-  result[16..<32] = s
-
 proc hashimoto(header: Hash[256],
               nonce: uint64,
               full_size: Natural,
@@ -188,9 +180,9 @@ proc hashimoto(header: Hash[256],
     mix = zipMap(mix, newdata, fnv(x, y))
 
   # compress mix (aka result.mix_digest)
-  for i in 0 ..< 4:
-    let idx = i*4
-    result.mix_digest[i] = mix[idx].fnv(mix[idx+1]).fnv(mix[idx+2]).fnv(mix[idx+3])
+  # TODO: what is the representation of mix during FNV? big-endian, native host endianess?
+  for i in countup(0, mix.len - 1, 4):
+    result.mix_digest[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
   result.value = keccak256 concat_hash(s, result.mix_digest)
 
