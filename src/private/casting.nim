@@ -7,6 +7,8 @@ type U512* = array[16, uint32]
   ## A very simple type alias to `xor` Hash[512] with normal integers
   ## and be able to do sha3_512 which only accepts arrays
 
+  # TODO delete this
+
 proc toU512*(x: Natural): U512 {.inline, noSideEffect.}=
   when system.cpuEndian == littleEndian:
     result[0] = x.uint32
@@ -102,7 +104,7 @@ proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffec
     # but in case of bigEndian, casting is much faster.
     const N = T.sizeof
     for i in 0 ..< N:
-      result[i] = byte(num shr uint((N-1-i) * 8))
+      result[i] = byte(num shr T((N-1-i) * 8))
 
 proc toByteArrayBE*(x: U512): ByteArrayBE[64] {.inline, noSideEffect, noInit.}=
   cast[type result](x)
