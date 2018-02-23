@@ -48,14 +48,15 @@ var hash = hexToByteArrayBE[32]("372eca2454ead349c3df0ab5d00b0b706b23e49d469387d
 let nonce = 0x495732e0ed7a801c'u
 
 let full_size = ethash_get_datasize(blkn)
-echo full_size
 
 let light_cache = ethash_light_new(blkn)
+
+assert blkn == light_cache.block_number
 
 let r = ethash_light_compute_internal(
   light_cache,
   full_size,
-  cast[ethash_h256_t](addr hash),
+  cast[ethash_h256_t](hash),
   nonce
 )
 
