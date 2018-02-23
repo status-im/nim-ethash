@@ -4,7 +4,7 @@
 import  math, sequtils, algorithm,
         keccak_tiny
 
-import  ./private/[primes, casting, functional, intmath, concat]
+import  ./private/[primes, casting, functional, intmath]
 export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE
 export keccak_tiny
 
@@ -147,7 +147,7 @@ proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.
 # ###############################################################################
 # Main loop
 
-type HashimotoHash = tuple[mix_digest: array[8, uint32], value: Hash[256]]
+type HashimotoHash = tuple[mix_digest: Hash[256], value: Hash[256]]
   # TODO use Hash as a result type
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
@@ -157,20 +157,32 @@ proc hashimoto(header: Hash[256],
               dataset_lookup: DatasetLookup
               ): HashimotoHash {.noInit, noSideEffect.}=
   let
-    n = uint32 full_size div HASH_BYTES # check div operator, in spec it's Python true division
-    w = uint32 MIX_BYTES div WORD_BYTES # TODO: review word bytes: uint32 vs uint64
+    n = uint32 full_size div HASH_BYTES
+    w = uint32 MIX_BYTES div WORD_BYTES
     mixhashes = uint32 MIX_BYTES div HASH_BYTES
-    # combine header+nonce into a 64 byte seed
-    s = concat_hash(header, nonce).toU512
+
+  assert full_size mod HASH_BYTES == 0
+  assert MIX_BYTES mod HASH_BYTES == 0
+
+  # combine header+nonce into a 64 byte seed
+  var s{.noInit.}: Hash[512]
+  let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
+  let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
+
+  s_bytes[0..<32] = header.toByteArrayBE            # We first populate the first 40 bytes of s with the concatenation
+  s_bytes[32..<40] = nonce.toByteArrayBE
+
+  s = keccak_512 s_bytes[0..<40]
 
   # start the mix with replicated s
-  var mix{.noInit.}: array[32, uint32] # MIX_BYTES / HASH_BYTES * sizeof(s) => 1024
-  mix[0..<16] = s
-  mix[16..<32] = s
+  assert MIX_BYTES div HASH_BYTES == 2
+  var mix{.noInit.}: array[32, uint32]
+  mix[0..<16] = s_words[]
+  mix[16..<32] = s_words[]
 
   # mix in random dataset nodes
   for i in 0'u32 ..< ACCESSES:
-    let p = fnv(i.uint32 xor s[0].uint32, mix[i mod w]) mod (n div mixhashes) * mixhashes
+    let p = fnv(i xor s_words[0], mix[i mod w]) mod (n div mixhashes) * mixhashes
 
     # Unrolled: for j in range(MIX_BYTES / HASH_BYTES): => for j in 0 ..< 2
     var newdata{.noInit.}: type mix
@@ -179,13 +191,19 @@ proc hashimoto(header: Hash[256],
 
     mix = zipMap(mix, newdata, fnv(x, y))
 
-  # compress mix (aka result.mix_digest)
-  # TODO: what is the representation of mix during FNV? big-endian, native host endianess?
+  # compress mix
+  var cmix: array[8, uint32]
   for i in countup(0, mix.len - 1, 4):
-    result.mix_digest[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
+    cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
-  result.value = keccak256 concat_hash(s, result.mix_digest)
+  result.mix_digest = cast[Hash[256]](
+    mapArray(cmix, x.toByteArrayBE) # Each uint32 must be changed to Big endian
+    )
 
+  var concat{.noInit.}: array[64 + 32, byte]
+  concat[0..<64] = s_bytes[]
+  concat[64..<96] = cast[array[32, byte]](cmix)
+  result.value = keccak_256(concat)
 
 proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
                       header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
