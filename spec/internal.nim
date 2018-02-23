@@ -1,5 +1,6 @@
 # GPLv3 license
 # Nim wrapper for libethash
+# As this is linking to GPLv3, do not use in production
 
 {.compile: "internal.c".}
 {.compile: "sha3.c".}
@@ -21,13 +22,6 @@ const
   ETHASH_DAG_MAGIC_NUM_SIZE* = 8
   ETHASH_DAG_MAGIC_NUM* = 0xFEE1DEADBADDCAFE'i64
 
-## / Type of a seedhash/blockhash e.t.c.
-
-type
-  ethash_h256_t* {.bycopy, importc.} = object
-    b*: array[32, uint8]
-
-
 const
   ENABLE_SSE* = 0
 
@@ -37,16 +31,32 @@ const
   MIX_NODES* = (MIX_WORDS div NODE_WORDS)
 
 type
+  ethash_h256_t* {.bycopy.} = object
+    b*: array[32, uint8]
   node* {.bycopy, importc.} = object {.union.}
-    bytes*: array[NODE_WORDS * 4, uint8]
-    words*: array[NODE_WORDS, uint32]
-    double_words*: array[NODE_WORDS div 2, uint64]
+    bytes*{.importc.}: array[NODE_WORDS * 4, uint8]
+    words*{.importc.}: array[NODE_WORDS, uint32]
+    double_words*{.importc.}: array[NODE_WORDS div 2, uint64]
 
   ethash_callback_t* {.importc.}= proc (a2: cuint): cint
   ethash_return_value_t* {.bycopy.} = object
     result*: ethash_h256_t
     mix_hash*: ethash_h256_t
     success*: bool
+
+  ethash_light* {.bycopy.} = object
+    cache*: pointer
+    cache_size*: uint64
+    block_number*: uint64
+
+  ethash_light_t {.importc.}= ptr ethash_light
+
+  ethash_full* {.bycopy.} = object
+    file*{.importc.}: ptr FILE
+    file_size*{.importc.}: uint64
+    data*{.importc.}: ptr node
+
+  ethash_full_t {.importc.}= ptr ethash_full
 
 proc ethash_h256_get*(hash: ptr ethash_h256_t; i: cuint): uint8 {.inline, importc.} =
   return hash.b[i]
@@ -70,14 +80,6 @@ proc ethash_h256_reset*(hash: ptr ethash_h256_t) {.inline, importc.} =
 proc ethash_quick_check_difficulty*(header_hash: ptr ethash_h256_t; nonce: uint64;
                                    mix_hash: ptr ethash_h256_t;
                                    boundary: ptr ethash_h256_t): bool {.importc.}
-type
-  ethash_light* {.bycopy, importc.} = object
-    cache*: pointer
-    cache_size*: uint64
-    block_number*: uint64
-
-  ethash_light_t = ptr ethash_light
-
 
 ## *
 ##  Allocate and initialize a new ethash_light handler. Internal version
@@ -100,15 +102,10 @@ proc ethash_light_new_internal*(cache_size: uint64; seed: ptr ethash_h256_t): et
 ##  @return               The resulting hash.
 ## 
 
+proc ethash_light_new*(block_number: uint64): ethash_light_t {.importc.}
+
 proc ethash_light_compute_internal*(light: ethash_light_t; full_size: uint64;
                                    header_hash: ethash_h256_t; nonce: uint64): ethash_return_value_t {.importc.}
-type
-  ethash_full* {.bycopy.} = object
-    file*: ptr FILE
-    file_size*: uint64
-    data*: ptr node
-
-  ethash_full_t = ptr ethash_full
 
 ## *
 ##  Allocate and initialize a new ethash_full handler. Internal version.

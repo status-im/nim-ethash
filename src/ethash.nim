@@ -172,7 +172,7 @@ proc hashimoto(header: Hash[256],
   s_bytes[0..<32] = header.toByteArrayBE            # We first populate the first 40 bytes of s with the concatenation
   s_bytes[32..<40] = nonce.toByteArrayBE
 
-  s = keccak_512 s_bytes[0..<40]
+  s = keccak_512 s_bytes[0..<40]                    # TODO: Does this allocate a seq?
 
   # start the mix with replicated s
   assert MIX_BYTES div HASH_BYTES == 2
@@ -192,13 +192,14 @@ proc hashimoto(header: Hash[256],
     mix = zipMap(mix, newdata, fnv(x, y))
 
   # compress mix
-  var cmix: array[8, uint32]
+  var cmix{.noInit.}: array[8, uint32]
   for i in countup(0, mix.len - 1, 4):
     cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
-  result.mix_digest = cast[Hash[256]](
-    mapArray(cmix, x.toByteArrayBE) # Each uint32 must be changed to Big endian
-    )
+  # result.mix_digest = cast[Hash[256]](
+  #   mapArray(cmix, x.toByteArrayBE) # Each uint32 must be changed to Big endian
+  #   )
+  result.mix_digest = cast[Hash[256]](cmix)
 
   var concat{.noInit.}: array[64 + 32, byte]
   concat[0..<64] = s_bytes[]
