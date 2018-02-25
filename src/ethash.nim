@@ -170,7 +170,11 @@ proc hashimoto(header: Hash[256],
   let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
 
   s_bytes[0..<32] = header.toByteArrayBE            # We first populate the first 40 bytes of s with the concatenation
-  s_bytes[32..<40] = nonce.toByteArrayBE
+
+  when system.cpuEndian == littleEndian:            # ⚠⚠ Warning ⚠⚠, the spec is WRONG compared to tests here
+    s_bytes[32..<40] = cast[array[8,byte]](nonce)   # the nonce should be concatenated with its LITTLE ENDIAN representation
+  else:
+    raise newException(ValueError, "Big endian system not supported yet")
 
   s = keccak_512 s_bytes[0..<40]                    # TODO: Does this allocate a seq?
 
@@ -196,6 +200,7 @@ proc hashimoto(header: Hash[256],
   for i in countup(0, mix.len - 1, 4):
     cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
+  # ⚠⚠ Warning ⚠⚠: Another big endian little endian issue?
   # result.mix_digest = cast[Hash[256]](
   #   mapArray(cmix, x.toByteArrayBE) # Each uint32 must be changed to Big endian
   #   )

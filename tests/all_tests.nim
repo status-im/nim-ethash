@@ -166,12 +166,12 @@ suite "Dagger hashimoto computation":
 
     check: $calc_dataset_item(cache, 0) == expected
 
-  # test "Real dataset and recomputation from cache matches":
-  #   # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L360-L374
-  #   for i in 0 ..< full_size div sizeof(Hash[512]):
-  #     for j in 0 ..< 32:
-  #       let expected = calc_dataset_item(cache, j)
-  #       check: full[j] == expected
+  test "Real dataset and recomputation from cache matches":
+    # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L360-L374
+    for i in 0 ..< full_size div sizeof(Hash[512]):
+      for j in 0 ..< 32:
+        let expected = calc_dataset_item(cache, j)
+        check: full[j] == expected
 
   test "Light and full Hashimoto agree":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/python/test_pyethash.py#L44-L58

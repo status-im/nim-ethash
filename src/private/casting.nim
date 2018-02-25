@@ -94,7 +94,7 @@ proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
     result[2*i+1] = hexChars[int ba[i] and 0xF]
 
 proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffect, noInit, inline.}=
-  ## Convert an UInt256 (in native host endianness) to a big-endian byte array
+  ## Convert an int (in native host endianness) to a big-endian byte array
   # Note: only works on devel
 
   when system.cpuEndian == bigEndian:
