@@ -233,8 +233,8 @@ suite "Real blocks test":
     )
 
   test "Verification of block 60000":
-    # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L603-L617
-    # POC-9 testnet, epoch 0
+    # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/ethash_test.go#L70-L78
+    # POC-9 testnet, epoch 2
     let blck = 60000'u # block number
     let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
     let header = cast[Hash[256]](
