@@ -135,7 +135,7 @@ suite "Seed hash":
 
     check: $get_seedhash(0) == zeroHex
 
-  test "Seed hash of the next 2048 blocks":
+  test "Seed hash of the next 2048 epochs (2048 * 30000 blocks)":
     var expected: Hash[256]
     for i in countup(0'u32, 30000 * 2048, 30000):
       check: get_seedhash(i) == expected
@@ -176,8 +176,6 @@ suite "Dagger hashimoto computation":
   test "Light and full Hashimoto agree":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/python/test_pyethash.py#L44-L58
 
-
-
     let
       light_result = hashimoto_light(full_size, cache, header, 0)
       dataset = calc_dataset(full_size, cache)
@@ -190,68 +188,66 @@ suite "Dagger hashimoto computation":
     check: light_result.value      != zero_hash
     check: light_result == full_result
 
-
-  ####
-  ####
-  ## The official implementation does not pass this test somehow ...
-  ####
-  # test "Light compute":
-  #   # https://github.com/paritytech/parity/blob/05f47b635951f942b493747ca3bc71de90a95d5d/ethash/src/compute.rs#L372-L394
-
-  #   let hash = cast[Hash[256]]([
-  #     byte 0xf5, 0x7e, 0x6f, 0x3a, 0xcf, 0xc0, 0xdd, 0x4b, 0x5b, 0xf2, 0xbe, 0xe4, 0x0a, 0xb3,
-  #     0x35, 0x8a, 0xa6, 0x87, 0x73, 0xa8, 0xd0, 0x9f, 0x5e, 0x59, 0x5e, 0xab, 0x55, 0x94,
-  #     0x05, 0x52, 0x7d, 0x72
-  #   ])
-
-  #   let expected_mix_hash = cast[Hash[256]]([
-  #     byte 0x1f, 0xff, 0x04, 0xce, 0xc9, 0x41, 0x73, 0xfd, 0x59, 0x1e, 0x3d, 0x89, 0x60, 0xce,
-  #     0x6b, 0xdf, 0x8b, 0x19, 0x71, 0x04, 0x8c, 0x71, 0xff, 0x93, 0x7b, 0xb2, 0xd3, 0x2a,
-  #     0x64, 0x31, 0xab, 0x6d
-  #   ])
-
-  #   let expected_boundary = cast[Hash[256]]([
-  #     byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x3e, 0x9b, 0x6c, 0x69, 0xbc, 0x2c, 0xe2, 0xa2,
-  #     0x4a, 0x8e, 0x95, 0x69, 0xef, 0xc7, 0xd7, 0x1b, 0x33, 0x35, 0xdf, 0x36, 0x8c, 0x9a,
-  #     0xe9, 0x7e, 0x53, 0x84
-  #   ])
-
-  #   let nonce = 0xd7b3ac70a301a249'u64
-  #   ## difficulty = 0x085657254bd9u64
-  #   let blk = 486382'u # block number
-  #   let light_cache = mkcache(blk.get_cache_size, blk.get_seedhash)
-
-  #   let r = hashimoto_light(blk.get_data_size,
-  #                           light_cache,
-  #                           blk.get_seedhash,
-  #                           nonce
-  #   )
-
-  #   check: r.mix_digest == expected_mix_hash
-  #   check: r.value      == expected_boundary
-
-
 suite "Real blocks test":
-
   test "Verification of block 22":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L603-L617
     # POC-9 testnet, epoch 0
-    let cache = mkcache(get_cachesize(22), get_seedhash(22))
-    let provided_seedhash = cast[Hash[256]](
+    let blck = 22'u # block number
+    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let header = cast[Hash[256]](
       hexToByteArrayBE[32]("372eca2454ead349c3df0ab5d00b0b706b23e49d469387db91811cee0358fc6d")
     )
 
     let light = hashimoto_light(
-      get_datasize(22),
+      get_datasize(blck),
       cache,
-      provided_seedhash,
+      header,
       0x495732e0ed7a801c'u
     )
 
-    ## Todo: blockhash is not actually Hex
     check: light.value == cast[Hash[256]](
       hexToByteArrayBE[32]("00000b184f1fdd88bfd94c86c39e65db0c36144d5e43f745f722196e730cb614")
     )
     check: light.mixDigest == cast[Hash[256]](
       hexToByteArrayBE[32]("2f74cdeb198af0b9abe65d22d372e22fb2d474371774a9583c1cc427a07939f5")
+    )
+
+  test "Verification of block 30001":
+    # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/ethash_test.go#L63-L69
+    # POC-9 testnet, epoch 1
+    let blck = 30001'u # block number
+    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let header = cast[Hash[256]](
+      hexToByteArrayBE[32]("7e44356ee3441623bc72a683fd3708fdf75e971bbe294f33e539eedad4b92b34")
+    )
+
+    let light = hashimoto_light(
+      get_datasize(blck),
+      cache,
+      header,
+      0x318df1c8adef7e5e'u
+    )
+
+    check: light.mixDigest == cast[Hash[256]](
+      hexToByteArrayBE[32]("144b180aad09ae3c81fb07be92c8e6351b5646dda80e6844ae1b697e55ddde84")
+    )
+
+  test "Verification of block 60000":
+    # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L603-L617
+    # POC-9 testnet, epoch 0
+    let blck = 60000'u # block number
+    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let header = cast[Hash[256]](
+      hexToByteArrayBE[32]("5fc898f16035bf5ac9c6d9077ae1e3d5fc1ecc3c9fd5bee8bb00e810fdacbaa0")
+    )
+
+    let light = hashimoto_light(
+      get_datasize(blck),
+      cache,
+      header,
+      0x50377003e5d830ca'u
+    )
+
+    check: light.mixDigest == cast[Hash[256]](
+      hexToByteArrayBE[32]("ab546a5b73c452ae86dadd36f0ed83a6745226717d3798832d1b20b489e82063")
     )
