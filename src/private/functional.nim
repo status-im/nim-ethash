@@ -35,22 +35,3 @@ template zipMap*[N: static[int], T, U](
     result[i] = op
 
   result
-
-
-template mapArray*[N: static[int], T](
-  a: array[N, T],
-  op: untyped): untyped =
-  ## inline map operation
-
-  type outType = type((
-    block:
-      var x{.inject.}: T;
-      op
-  ))
-
-  var result: array[N, outType]
-
-  for i, x {.inject.} in a:
-    {.unroll: 4.}
-    result[i] = op
-  result

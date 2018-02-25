@@ -3,32 +3,9 @@
 
 import keccak_tiny
 
-type U512* = array[16, uint32]
-  ## A very simple type alias to `xor` Hash[512] with normal integers
-  ## and be able to do sha3_512 which only accepts arrays
-
-  # TODO delete this
-
-proc toU512*(x: Natural): U512 {.inline, noSideEffect.}=
-  when system.cpuEndian == littleEndian:
-    result[0] = x.uint32
-  else:
-    result[result.high] = x.uint32
-
-proc toU512*(x: Hash[512]): U512 {.inline, noSideEffect, noInit.}=
+proc as_u32_words*[N: static[int]](x: Hash[N]): array[N div 32, uint32] {.inline, noSideEffect, noInit.}=
+  # Convert an hash to its uint32 representation
   cast[type result](x)
-
-proc `xor`*(x, y: U512): U512 {.inline, noSideEffect, noInit.}=
-  for i in 0 ..< result.len:
-    {.unroll: 4.}
-    result[i] = x[i] xor y[i]
-
-proc toHash512*(x: U512): Hash[512] {.inline, noSideEffect, noInit.}=
-  cast[type result](x)
-
-
-# ### Hex conversion
-
 
 type ByteArrayBE*[N: static[int]] = array[N, byte]
   ## A byte array that stores bytes in big-endian order
@@ -70,7 +47,6 @@ proc hexToSeqBytesBE*(hexStr: string): seq[byte] {.noSideEffect.}=
 proc toHex*[N: static[int]](ba: ByteArrayBE[N]): string {.noSideEffect.}=
   ## Convert a big-endian byte array to its hex representation
   ## Output is in lowercase
-  ##
 
   const hexChars = "0123456789abcdef"
 
@@ -82,7 +58,6 @@ proc toHex*[N: static[int]](ba: ByteArrayBE[N]): string {.noSideEffect.}=
 proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
   ## Convert a big-endian byte sequence to its hex representation
   ## Output is in lowercase
-  ##
 
   let N = ba.len
   const hexChars = "0123456789abcdef"
@@ -106,8 +81,5 @@ proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffec
     for i in 0 ..< N:
       result[i] = byte(num shr T((N-1-i) * 8))
 
-proc toByteArrayBE*(x: U512): ByteArrayBE[64] {.inline, noSideEffect, noInit.}=
-  cast[type result](x)
-
 proc toByteArrayBE*[N: static[int]](x: Hash[N]): ByteArrayBE[N div 8] {.inline, noSideEffect, noInit.}=
-  cast[type result](x)
+  cast[type result](x.data)

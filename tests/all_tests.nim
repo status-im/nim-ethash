@@ -139,7 +139,7 @@ suite "Seed hash":
     var expected: Hash[256]
     for i in countup(0'u32, 30000 * 2048, 30000):
       check: get_seedhash(i) == expected
-      expected = keccak_256(expected.toByteArrayBE)
+      expected = keccak_256(expected.data)
 
 suite "Dagger hashimoto computation":
     # We can't replicate Python's dynamic typing here

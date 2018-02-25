@@ -1,16 +1,12 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import  math, sequtils, algorithm,
+import  math, endians,
         keccak_tiny
 
 import  ./private/[primes, casting, functional, intmath]
-export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE
+export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE # debug functions
 export keccak_tiny
-
-# TODO: Switching from default int to uint64
-# Note: array/seq indexing requires an Ordinal, uint64 are not.
-# So to index arrays/seq we would need to cast uint64 to int anyway ...
 
 # ###############################################################################
 # Definitions
@@ -22,16 +18,13 @@ const
   DATASET_BYTES_GROWTH* = 2'u^23     # dataset growth per epoch
   CACHE_BYTES_INIT* = 2'u^24         # bytes in cache at genesis
   CACHE_BYTES_GROWTH* = 2'u^17       # cache growth per epoch
-  CACHE_MULTIPLIER=1024              # Size of the DAG relative to the cache
+  CACHE_MULTIPLIER = 1024            # Size of the DAG relative to the cache
   EPOCH_LENGTH* = 30000              # blocks per epoch
   MIX_BYTES* = 128                   # width of mix
   HASH_BYTES* = 64                   # hash length in bytes
   DATASET_PARENTS* = 256             # number of parents of each dataset element
   CACHE_ROUNDS* = 3                  # number of rounds in cache production
   ACCESSES* = 64                     # number of accesses in hashimoto loop
-
-  # MAGIC_NUM ?
-  # MAGIC_NUM_SIZE ?
 
 # ###############################################################################
 # Parameters
@@ -67,24 +60,23 @@ proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} 
 
 proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
 
-  # The starting cache size is a set of 524288 64-byte values
-
+  # Cache size
   let n = int(cache_size div HASH_BYTES)
 
   # Sequentially produce the initial dataset
   result = newSeq[Hash[512]](n)
-  result[0] = keccak512 seed.toByteArrayBE
+  result[0] = keccak512 seed.data
 
   for i in 1 ..< n:
-    result[i] = keccak512 result[i-1].toU512
+    result[i] = keccak512 result[i-1].data
 
   # Use a low-round version of randmemohash
   for _ in 0 ..< CACHE_ROUNDS:
     for i in 0 ..< n:
       let
-        v = result[i].toU512[0] mod n.uint32
-        a = result[(i-1+n) mod n].toU512
-        b = result[v.int].toU512
+        v = result[i].as_u32_words[0] mod n.uint32
+        a = result[(i-1+n) mod n].data
+        b = result[v.int].data
       result[i] = keccak512 zipMap(a, b, x xor y)
 
 # ###############################################################################
@@ -106,9 +98,7 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
   #   - for powers of 2: a mod 2^p == a and (2^p - 1)
   #   - 2^32 - 1 == high(uint32)
 
-
-  # # mulmod(v1 and mask, FNV_PRIME.T, (2^32).T) xor (v2 and mask)
-  # Casting to uint32 should do the modulo and masking just fine
+  # So casting to uint32 should do the modulo and masking just fine
 
   (v1.uint32 * FNV_PRIME) xor v2.uint32
 
@@ -116,26 +106,25 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
 # Full dataset calculation
 
 proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
-  # TODO review WORD_BYTES
-  # TODO use uint32 instead of uint64
-  # and mix[0] should be uint32
-
   let n = cache.len
   const r: uint32 = HASH_BYTES div WORD_BYTES
 
-  var mix = cast[U512](cache[i mod n])
+  # Alias for the result value. Interpreted as an array of uint32 words
+  var mix = cast[ptr array[16, uint32]](addr result)
+
+  mix[] = cache[i mod n].as_u32_words
   when system.cpuEndian == littleEndian:
     mix[0] = mix[0] xor i.uint32
   else:
-    mix[high(mix)] = mix[high(0)] xor i.uint32
-  mix = toU512 keccak512 mix
+    mix[high(mix)] = mix[high(mix)] xor i.uint32
+  result = keccak512 mix[]
 
   # FNV with a lots of random cache nodes based on i
   for j in 0'u32 ..< DATASET_PARENTS:
     let cache_index = fnv(i.uint32 xor j, mix[j mod r])
-    mix = zipMap(mix, cache[cache_index.int mod n].toU512, fnv(x, y))
+    mix[] = zipMap(mix[], cache[cache_index.int mod n].as_u32_words, fnv(x, y))
 
-  result = keccak512 mix
+  result = keccak512 mix[]
 
 proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
 
@@ -148,7 +137,6 @@ proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.
 # Main loop
 
 type HashimotoHash = tuple[mix_digest: Hash[256], value: Hash[256]]
-  # TODO use Hash as a result type
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
 proc hashimoto(header: Hash[256],
@@ -169,12 +157,11 @@ proc hashimoto(header: Hash[256],
   let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
   let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
 
-  s_bytes[0..<32] = header.toByteArrayBE            # We first populate the first 40 bytes of s with the concatenation
+  s_bytes[0..<32] = header.data                     # We first populate the first 40 bytes of s with the concatenation
 
-  when system.cpuEndian == littleEndian:            # ⚠⚠ Warning ⚠⚠, the spec is WRONG compared to tests here
-    s_bytes[32..<40] = cast[array[8,byte]](nonce)   # the nonce should be concatenated with its LITTLE ENDIAN representation
-  else:
-    raise newException(ValueError, "Big endian system not supported yet")
+  var nonceLE{.noInit.}: array[8, byte]             # the nonce should be concatenated with its LITTLE ENDIAN representation
+  littleEndian64(addr nonceLE, unsafeAddr nonce)
+  s_bytes[32..<40] = cast[array[8,byte]](nonceLE)
 
   s = keccak_512 s_bytes[0..<40]                    # TODO: Does this allocate a seq?
 
@@ -200,10 +187,8 @@ proc hashimoto(header: Hash[256],
   for i in countup(0, mix.len - 1, 4):
     cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
-  # ⚠⚠ Warning ⚠⚠: Another big endian little endian issue?
-  # result.mix_digest = cast[Hash[256]](
-  #   mapArray(cmix, x.toByteArrayBE) # Each uint32 must be changed to Big endian
-  #   )
+  # ⚠⚠ Warning ⚠⚠: Another bigEndian littleEndian issue?
+  # It doesn't seem like the uint32 in cmix need to be changed to big endian
   result.mix_digest = cast[Hash[256]](cmix)
 
   var concat{.noInit.}: array[64 + 32, byte]
@@ -233,6 +218,5 @@ proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
 # Defining the seed hash
 
 proc get_seedhash*(block_number: uint64): Hash[256] {.noSideEffect.} =
-  # uint64 are not Ordinal :/
   for i in 0 ..< int(block_number div EPOCH_LENGTH):
-    result = keccak256 result.toByteArrayBE
+    result = keccak256 result.data
