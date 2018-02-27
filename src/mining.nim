@@ -12,7 +12,7 @@ proc readUint256BE*(ba: ByteArrayBE[32]): UInt256 {.noSideEffect.}=
   for i in 0 ..< N:
     result = result shl 8 or ba[i].u256
 
-proc willMulOverflow(a, b: uint64): bool {.inline,noSideEffect.}=
+proc willMulOverflow(a, b: uint64): bool {.noSideEffect.}=
   # We assume a <= b
   if a > b:
     return willMulOverflow(b, a)
