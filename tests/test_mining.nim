@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import ../src/ethash, unittest, keccak_tiny, times
+import ../src/ethash, unittest, keccak_tiny, times, strutils
 
 suite "Test mining":
 
@@ -29,3 +29,12 @@ suite "Test mining":
     echo "    Done, time taken: ", $(cpuTime() - start), " seconds"
 
     check: mined_nonce == 0x495732e0ed7a801c'u64
+
+  # test "1st test from official ethereum/tests repo":
+  #   # https://github.com/ethereum/tests/blob/b6aa0947a8e20f4140dd2647882791be6ceb2ac5/PoWTests/ethash_tests.json
+
+  #   let
+  #     seed = Hash[256]()
+  #     cache = mkcache(16776896, seed)
+
+  #   check: $keccak_256(cache) == toUpperAscii "35ded12eecf2ce2e8da2e15c06d463aae9b84cb2530a00b932e4bbc484cde353"

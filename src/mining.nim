@@ -13,6 +13,9 @@ proc readUint256BE*(ba: ByteArrayBE[32]): UInt256 {.noSideEffect.}=
     result = result shl 8 or ba[i].u256
 
 proc willMulOverflow(a, b: uint64): bool {.noSideEffect.}=
+  # Returns true if a * b overflows
+  #         false otherwise
+
   # We assume a <= b
   if a > b:
     return willMulOverflow(b, a)
@@ -93,7 +96,7 @@ proc isValid(nonce: uint64,
   else:
     let hi_hash = candidate.table[0]
 
-  result = willMulOverflow(hi_hash, difficulty)
+  result = not willMulOverflow(hi_hash, difficulty)
 
 
 proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], difficulty: uint64): uint64 =
