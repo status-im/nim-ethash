@@ -6,8 +6,8 @@
 
 import ./intmath
 
-proc isPrime*(x: SomeUnsignedInt): bool {.noSideEffect.}=
-  for i in 2 .. isqrt x:
+proc isPrime*[T: SomeUnsignedInt](x: T): bool {.noSideEffect.}=
+  for i in 2.T .. isqrt x:
     if x mod i == 0:
       return false
   return true

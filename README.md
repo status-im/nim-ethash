@@ -6,6 +6,10 @@ A pure Nim implementation of Ethash, the Ethereum proof of work
 
 Implementation is based on the [spec revision 23 (2017-08-03)](https://github.com/ethereum/wiki/wiki/Ethash) and under the Apache License v2.
 
+## Mining
+An unoptimized mining CPU backend is available through the compile-time flag ``-d:ethash_mining``.
+It requires compilation through the C++ backend.
+
 ## Original implementation
 Original Ethereum implementation is available [here](https://github.com/ethereum/ethash).
 
