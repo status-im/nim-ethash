@@ -1,8 +1,8 @@
 packageName   = "ethash"
 version       = "0.0.1"
 author        = "Status Research & Development GmbH"
-description   = "A reimplementation in pure Nim of ethash, the ethereum proof-of-work algorithm"
-license       = "Apachev2"
+description   = "A Nim implementation of Ethash, the Ethereum proof-of-work hashing function"
+license       = "Apache License 2.0"
 srcDir        = "src"
 
 ### Dependencies
@@ -26,3 +26,4 @@ task test_mining, "Run Proof-of-Work and mining tests (test in release mode)":
   switch("define", "release")
   switch("define", "ethash_mining")
   test "all_tests", "cpp"
+
