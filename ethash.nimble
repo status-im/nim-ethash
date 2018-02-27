@@ -7,7 +7,7 @@ srcDir        = "src"
 
 ### Dependencies
 
-requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0", "ttmath > 0.2.0" # ttmath with exposed table field is required for mining only
+requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0"
 
 proc test(name: string, lang: string = "c") =
   if not dirExists "build":
@@ -25,5 +25,4 @@ task test, "Run Proof-of-Work tests (without mining)":
 task test_mining, "Run Proof-of-Work and mining tests (test in release mode)":
   switch("define", "release")
   switch("define", "ethash_mining")
-  test "all_tests", "cpp"
-
+  test "all_tests"

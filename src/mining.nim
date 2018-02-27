@@ -2,15 +2,7 @@
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import ./proof_of_work, ./private/casting
-import ttmath, random, math
-# TODO we don't really need ttmath here
-
-
-proc readUint256BE*(ba: ByteArrayBE[32]): UInt256 {.noSideEffect.}=
-  ## Convert a big-endian array of Bytes to an UInt256 (in native host endianness)
-  const N = 32
-  for i in 0 ..< N:
-    result = result shl 8 or ba[i].u256
+import endians, random, math
 
 proc willMulOverflow(a, b: uint64): bool {.noSideEffect.}=
   # Returns true if a * b overflows
@@ -77,9 +69,7 @@ proc isValid(nonce: uint64,
   # i.e we only need to test that hashimoto * difficulty doesn't overflow uint256
 
   # First run the hashimoto with the candidate nonce
-  let candidate = readUint256BE(cast[ByteArrayBE[32]](
-    hashimoto_full(full_size, dataset, header, nonce).value
-  ))
+  let candidate_hash = hashimoto_full(full_size, dataset, header, nonce)
 
   # Now check if the multiplication of both would overflow
 
@@ -91,13 +81,17 @@ proc isValid(nonce: uint64,
   #
   # Overflow occurs only if "1 * 5" overflows 2^64
 
+  # First we convert the Hash[256] to an array of 4 uint64 and then
+  # only consider the most significant
+  let hash_qwords = cast[array[4, uint64]](candidate_hash.value)
+  var hi_hash: uint64
+
   when system.cpuEndian == littleEndian:
-    let hi_hash = candidate.table[3]
+    littleEndian64(hi_hash.addr, hash_qwords[3].unsafeAddr)
   else:
-    let hi_hash = candidate.table[0]
+    littleEndian64(hi_hash.addr, hash_qwords[0].unsafeAddr)
 
   result = not willMulOverflow(hi_hash, difficulty)
-
 
 proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], difficulty: uint64): uint64 =
   # Returns a valid nonce
