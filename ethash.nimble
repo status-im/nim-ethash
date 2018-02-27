@@ -7,7 +7,7 @@ srcDir        = "src"
 
 ### Dependencies
 
-requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0", "ttmath >= 0.2.0" # ttmath is required for mining only
+requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0", "ttmath > 0.2.0" # ttmath with exposed table field is required for mining only
 
 proc test(name: string, lang: string = "c") =
   if not dirExists "build":

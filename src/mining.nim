@@ -2,34 +2,9 @@
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import ./proof_of_work, ./private/casting
-import ttmath, random
+import ttmath, random, math
+# TODO we don't really need ttmath here
 
-let # NimVM cannot evaluate those at compile-time. So they are considered side-effects :/
-  high_uint256 = 0.u256 - 1.u256
-  half_max     = pow(2.u256, 255)
-
-proc getBoundary(difficulty: uint64): UInt256 {.noInit, inline.} =
-
-  # Boundary is 2^256/difficulty
-  # We can't represent 2^256 as an uint256 so as a workaround we use:
-  #
-  # a mod b == (2 * a div 2) mod b
-  #         == (2 * (a div 2) mod b) mod b
-  #
-  # if 2^256 mod b = 0: # b is even (and a power of two)
-  #   result = 2^255 div (b div 2)
-  # if 2^256 mod b != 0:
-  #   result = high(uint256) div b
-
-  # TODO: review/test
-
-  let b = difficulty.u256
-  let modulo = (2.u256 * (half_max mod b)) mod b
-
-  if modulo == 0.u256:
-    result = half_max div (b shr 1)
-  else:
-    result = high_uint256 div b
 
 proc readUint256BE*(ba: ByteArrayBE[32]): UInt256 {.noSideEffect.}=
   ## Convert a big-endian array of Bytes to an UInt256 (in native host endianness)
@@ -37,22 +12,96 @@ proc readUint256BE*(ba: ByteArrayBE[32]): UInt256 {.noSideEffect.}=
   for i in 0 ..< N:
     result = result shl 8 or ba[i].u256
 
+proc willMulOverflow(a, b: uint64): bool {.inline,noSideEffect.}=
+  # We assume a <= b
+  if a > b:
+    return willMulOverflow(b, a)
+
+  # See https://en.wikipedia.org/wiki/Karatsuba_algorithm
+  # For our representation, it is similar to school grade multiplication
+  # Consider hi and lo as if they were digits
+  # i.e.
+  #      a = a_hi * 2^32 + a_lo
+  #      b = b_hi * 2^32 + b_lo
+  #
+  #     15   b
+  # X   12   a
+  # ------
+  #     10   lo*lo -> z0
+  #     2    hi*lo -> z1
+  #     5    lo*hi -> z1
+  #    10    hi*hi -- z2
+  # ------
+  #    180
+
+  const hi32 = high(uint32).uint64
+
+  # Case 1: Check if a_hi != 0
+  #   covers "a_hi * b_hi" and "a_hi * b_lo"
+  if a > hi32:
+    # both are bigger than 2^32 and will overflow
+    # remember a < b
+    return true
+
+  # Case 2: check if a_lo * b_hi overflows
+  # Note:
+  #   - a_lo = a (no a_hi following case 1)
+  #   - b_hi = b shr 32
+
+  let z1 = a * (b shr 32)
+  if z1 > hi32:
+    return true
+
+  # Lastly we add z1 and z0 while checking for overflow
+  # Note: b_low = b and high(uint32)
+  # We have mul(a, b) = z1 * 2^32 + z0
+
+  # If a + b overflows, the result is lower than a
+  let z0 = a * (b and hi32)
+  let carry_test = z1 shl 32
+
+  result = carry_test + z0 < carry_test
+
 proc isValid(nonce: uint64,
-            boundary: UInt256,
+            difficulty: uint64,
             full_size: Natural,
             dataset: seq[Hash[512]],
             header: Hash[256]): bool {.noSideEffect.}=
+  # Boundary is 2^256/difficulty
+  # A valid nonce will have: hashimoto < 2^256/difficulty
+  # We can't represent 2^256 as an uint256 so as a workaround we use:
+  # difficulty * hashimoto <= 2^256 - 1
+  # i.e we only need to test that hashimoto * difficulty doesn't overflow uint256
 
-  let candidate = hashimoto_full(full_size, dataset, header, nonce)
-  result = readUint256BE(cast[ByteArrayBE[32]](candidate.value)) <= boundary
+  # First run the hashimoto with the candidate nonce
+  let candidate = readUint256BE(cast[ByteArrayBE[32]](
+    hashimoto_full(full_size, dataset, header, nonce).value
+  ))
+
+  # Now check if the multiplication of both would overflow
+
+  # We are now in the following case in base 2^64 instead of base 10
+  #   1234   hashimoto  1 * (2^64)^3 + 2 * (2^64)^2 + 3 * (2^64)^1 + 4
+  # X    5   difficulty 5
+  # ------
+  # ......
+  #
+  # Overflow occurs only if "1 * 5" overflows 2^64
+
+  when system.cpuEndian == littleEndian:
+    let hi_hash = candidate.table[3]
+  else:
+    let hi_hash = candidate.table[0]
+
+  result = willMulOverflow(hi_hash, difficulty)
+
 
 proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], difficulty: uint64): uint64 =
   # Returns a valid nonce
 
-  let target = difficulty.getBoundary
   randomize()                       # Start with a completely random seed
   result = uint64 random(high(int)) # TODO: Nim random does not work on uint64 range.
                                     #       Also random is deprecate and do not include the end of the range.
 
-  while not result.isValid(target, full_size, dataset, header):
+  while not result.isValid(difficulty, full_size, dataset, header):
     inc(result) # we rely on uin overflow (mod 2^64) here.
