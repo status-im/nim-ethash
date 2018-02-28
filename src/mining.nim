@@ -43,7 +43,6 @@ proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
 
   # Case 1: z0 = a_lo * b_lo
   # It cannot overflow
-  # We only need the hi part of z0, to add to the lo part of z1
     z0 = a_lo * b_lo
 
   # Case 2: z1 = a_lo * b_hi + a_hi * b_lo
@@ -89,7 +88,7 @@ proc isValid(nonce: uint64,
 
   # First we convert the Hash[256] to an array of 4 uint64 and then
   # only consider the most significant
-  let hash_qwords = cast[array[4, uint64]](candidate_hash.value)
+  let hash_qwords = cast[ptr array[4, uint64]](candidate_hash.value.unsafeAddr)
   var
     unit = 0'u64
     carry = 0'u64

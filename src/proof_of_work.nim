@@ -187,17 +187,16 @@ template hashimoto(header: Hash[256],
     mix = zipMap(mix, newdata, fnv(x, y))
 
   # compress mix
-  var cmix{.noInit.}: array[8, uint32]
+  # ⚠⚠ Warning ⚠⚠: Another bigEndian littleEndian issue?
+  # It doesn't seem like the uint32 in cmix need to be changed to big endian
+  # cmix is an alias to the result.mix_digest
+  let cmix = cast[ptr array[8, uint32]](addr result.mix_digest)
   for i in countup(0, mix.len - 1, 4):
     cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
-  # ⚠⚠ Warning ⚠⚠: Another bigEndian littleEndian issue?
-  # It doesn't seem like the uint32 in cmix need to be changed to big endian
-  result.mix_digest = cast[Hash[256]](cmix)
-
   var concat{.noInit.}: array[64 + 32, byte]
   concat[0..<64] = s_bytes[]
-  concat[64..<96] = cast[array[32, byte]](cmix)
+  concat[64..<96] = cast[array[32, byte]](result.mix_digest)
   result.value = keccak_256(concat)
 
 proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
