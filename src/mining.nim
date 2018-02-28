@@ -4,13 +4,18 @@
 import ./proof_of_work, ./private/casting
 import endians, random, math
 
-proc willMulOverflow(a, b: uint64): bool {.noSideEffect.}=
-  # Returns true if a * b overflows
-  #         false otherwise
-
-  # We assume a <= b
-  if a > b:
-    return willMulOverflow(b, a)
+proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
+  ## Multiplication in extended precision
+  ## Returns a tuple of carry and unit that satisfies
+  ## a * b = carry * 2^64 + unit
+  ##
+  ## Note, we work in base 2^64
+  ##   - 2^32 * 2^32 = 1 * 2^64 --> carry of 1
+  ##   - 2^33 * 2^33 = 2^66 = 2^2 * 2^64 = 4 * 2^64 --> carry of 4
+  ##
+  ## This is similar in base 10 to
+  ##   - 2 * 5 = 1 * 10 --> carry of 1
+  ##   - 8 * 5 = 4 * 10 --> carry of 4
 
   # See https://en.wikipedia.org/wiki/Karatsuba_algorithm
   # For our representation, it is similar to school grade multiplication
@@ -30,32 +35,31 @@ proc willMulOverflow(a, b: uint64): bool {.noSideEffect.}=
   #    180
 
   const hi32 = high(uint32).uint64
+  let
+    a_lo = a and hi32
+    a_hi = a shr 32
+    b_lo = b and hi32
+    b_hi = b shr 32
 
-  # Case 1: Check if a_hi != 0
-  #   covers "a_hi * b_hi" and "a_hi * b_lo"
-  if a > hi32:
-    # both are bigger than 2^32 and will overflow
-    # remember a < b
-    return true
+  # Case 1: z0 = a_lo * b_lo
+  # It cannot overflow
+  # We only need the hi part of z0, to add to the lo part of z1
+    z0 = a_lo * b_lo
 
-  # Case 2: check if a_lo * b_hi overflows
-  # Note:
-  #   - a_lo = a (no a_hi following case 1)
-  #   - b_hi = b shr 32
+  # Case 2: z1 = a_lo * b_hi + a_hi * b_lo
+    lohi = a_lo * b_hi
+    hilo = a_hi * b_lo
+    z1 = lohi + hilo
 
-  let z1 = a * (b shr 32)
-  if z1 > hi32:
-    return true
+  # Case 3: z2 = carry + a_hi * b_hi
+    z2 = (z1 < lohi).uint64 + (a_hi * b_hi)
 
-  # Lastly we add z1 and z0 while checking for overflow
-  # Note: b_low = b and high(uint32)
-  # We have mul(a, b) = z1 * 2^32 + z0
-
-  # If a + b overflows, the result is lower than a
-  let z0 = a * (b and hi32)
-  let carry_test = z1 shl 32
-
-  result = carry_test + z0 < carry_test
+  # Finally
+  # result.unit is always equal to (a * b) mod 2^64
+  # result.carry is (a * b) div 2^64 (provided a and b < 2^64)
+  result.unit = z1 shl 32
+  result.unit += z0
+  result.carry = (result.unit < z0).uint64 + z2 + z1 shr 32
 
 proc isValid(nonce: uint64,
             difficulty: uint64,
@@ -79,19 +83,38 @@ proc isValid(nonce: uint64,
   # ------
   # ......
   #
-  # Overflow occurs only if "1 * 5" overflows 2^64
+  # We multiply the lowest power, keep track of the carry
+  # Multiply next power, add the previous carry, get a new carry
+  # We check if the very last carry is 0
 
   # First we convert the Hash[256] to an array of 4 uint64 and then
   # only consider the most significant
   let hash_qwords = cast[array[4, uint64]](candidate_hash.value)
-  var hi_hash: uint64
+  var
+    unit = 0'u64
+    carry = 0'u64
+
+  template doMulCarry() =
+    let prev_carry = carry
+    (carry, unit) = mulCarry(difficulty, hash_qwords[i])
+
+    # Add the previous carry, if it overflows add one to the next carry
+    unit += prev_carry
+    carry += (unit < prev_carry).uint64
 
   when system.cpuEndian == littleEndian:
-    littleEndian64(hi_hash.addr, hash_qwords[3].unsafeAddr)
-  else:
-    littleEndian64(hi_hash.addr, hash_qwords[0].unsafeAddr)
+    for i in countdown(3, 0):
+      {.unroll: 4.}
+      doMulCarry()
 
-  result = not willMulOverflow(hi_hash, difficulty)
+  else:
+    for i in 0 .. 3:
+      {.unroll: 4.}
+      doMulCarry()
+
+  result = carry == 0
+
+
 
 proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], difficulty: uint64): uint64 =
   # Returns a valid nonce
