@@ -19,16 +19,16 @@ suite "Test mining":
       full_size = get_datasize(blck)
 
     echo "\nGenerating dataset"
-    var start = cpuTime()
+    var start = epochTime()
     let dag = calc_dataset(full_size, cache)
-    echo "    Done, time taken: ", $(cpuTime() - start), " seconds"
+    echo "    Done, time taken: ", $(epochTime() - start), " seconds"
 
     echo "\nStarting mining"
-    start = cpuTime()
+    start = epochTime()
     let mined_nonce = mine(full_size, dag, header, difficulty)
-    echo "    Done, time taken: ", $(cpuTime() - start), " seconds"
+    echo "    Done, time taken: ", $(epochTime() - start), " seconds"
 
-    echo "\nUnfortunately we can't really test Ethereu mining as multiple nonces are valid"
+    echo "\nUnfortunately we can't really test Ethereum mining as multiple nonces are valid"
     echo "for a set of parameters, so we only test that there is no exception or out of memory"
     echo "\nThe nonce mined was:"
     echo mined_nonce

@@ -22,7 +22,9 @@ proc test(name: string, lang: string = "c") =
 task test, "Run Proof-of-Work tests (without mining)":
   test "all_tests"
 
-task test_mining, "Run Proof-of-Work and mining tests (test in release mode)":
+task test_mining, "Run Proof-of-Work and mining tests (test in release mode + OpenMP + march=native)":
   switch("define", "release")
+  switch("define", "openmp")
+  switch("define", "march_native")
   switch("define", "ethash_mining")
   test "all_tests"

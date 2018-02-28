@@ -10,6 +10,11 @@ Implementation is based on the [spec revision 23 (2017-08-03)](https://github.co
 An unoptimized mining CPU backend is available through the compile-time flag ``-d:ethash_mining``.
 It requires compilation through the C++ backend.
 
+## Optimizations
+For maximum speed, compile Ethash with `-d:release -d:march_native -d:openmp`.
+This will compile Ethash in Nim release mode, with all supported CPU extensions (AVX2 especially) and with OpenMP multiprocessing
+On MacOS, OpenMP requires installing GCC-7. It can be done through homebrew.
+
 ## Original implementation
 Original Ethereum implementation is available [here](https://github.com/ethereum/ethash).
 

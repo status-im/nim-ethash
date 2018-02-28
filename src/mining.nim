@@ -120,7 +120,7 @@ proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], diffi
 
   randomize()                       # Start with a completely random seed
   result = uint64 random(high(int)) # TODO: Nim random does not work on uint64 range.
-                                    #       Also random is deprecate and do not include the end of the range.
+                                    #       Also random is deprecated in devel and does not include the end of the range.
 
   while not result.isValid(difficulty, full_size, dataset, header):
-    inc(result) # we rely on uin overflow (mod 2^64) here.
+    inc(result) # we rely on uint overflow (mod 2^64) here.

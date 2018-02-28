@@ -126,18 +126,24 @@ proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEf
 
   result = keccak512 mix[]
 
-proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.noSideEffect.} =
+when defined(openmp):
+  # Remove stacktraces when using OpenMP, heap alloc from strings will crash.
+  {.push stacktrace: off.}
+proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] =
 
   result = newSeq[Hash[512]](full_size div HASH_BYTES)
+  for i in `||`(0, result.len - 1, "simd"):
+    # OpenMP loop
+    result[i] = calc_dataset_item(cache, i)
 
-  for i, hash in result.mpairs:
-    hash = calc_dataset_item(cache, i)
+when defined(openmp):
+  # Remove stacktraces when using OpenMP, heap alloc from strings will crash.
+  {.pop.}
 
 # ###############################################################################
 # Main loop
 
-type HashimotoHash = tuple[mix_digest: Hash[256], value: Hash[256]]
-type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
+type HashimotoHash = tuple[mix_digest, value: Hash[256]]
 
 template hashimoto(header: Hash[256],
               nonce: uint64,
