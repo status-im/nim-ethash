@@ -139,11 +139,13 @@ proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] {.
 type HashimotoHash = tuple[mix_digest: Hash[256], value: Hash[256]]
 type DatasetLookup = proc(i: Natural): Hash[512] {.noSideEffect.}
 
-proc hashimoto(header: Hash[256],
+template hashimoto(header: Hash[256],
               nonce: uint64,
               full_size: Natural,
-              dataset_lookup: DatasetLookup
-              ): HashimotoHash {.noInit, noSideEffect.}=
+              dataset_lookup_p: untyped,
+              dataset_lookup_p1: untyped,
+              result: var HashimotoHash
+              ) =
   let
     n = uint32 full_size div HASH_BYTES
     w = uint32 MIX_BYTES div WORD_BYTES
@@ -157,13 +159,14 @@ proc hashimoto(header: Hash[256],
   let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
   let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
 
-  s_bytes[0..<32] = header.data                     # We first populate the first 40 bytes of s with the concatenation
+  s_bytes[][0..<32] = header.data                   # We first populate the first 40 bytes of s with the concatenation
+                                                    # In template we need to dereference first otherwise it's not considered as var
 
   var nonceLE{.noInit.}: array[8, byte]             # the nonce should be concatenated with its LITTLE ENDIAN representation
   littleEndian64(addr nonceLE, unsafeAddr nonce)
-  s_bytes[32..<40] = cast[array[8,byte]](nonceLE)
+  s_bytes[][32..<40] = cast[array[8,byte]](nonceLE)
 
-  s = keccak_512 s_bytes[0..<40]                    # TODO: Does this allocate a seq?
+  s = keccak_512 s_bytes[][0..<40]                  # TODO: Does this allocate a seq?
 
   # start the mix with replicated s
   assert MIX_BYTES div HASH_BYTES == 2
@@ -173,12 +176,13 @@ proc hashimoto(header: Hash[256],
 
   # mix in random dataset nodes
   for i in 0'u32 ..< ACCESSES:
-    let p = fnv(i xor s_words[0], mix[i mod w]) mod (n div mixhashes) * mixhashes
+    let p{.inject.} = fnv(i xor s_words[0], mix[i mod w]) mod (n div mixhashes) * mixhashes
+    let p1{.inject.} = p + 1
 
     # Unrolled: for j in range(MIX_BYTES / HASH_BYTES): => for j in 0 ..< 2
     var newdata{.noInit.}: type mix
-    newdata[0..<16] = cast[array[16, uint32]](dataset_lookup(p))
-    newdata[16..<32] = cast[array[16, uint32]](dataset_lookup(p+1))
+    newdata[0..<16] = cast[array[16, uint32]](dataset_lookup_p)
+    newdata[16..<32] = cast[array[16, uint32]](dataset_lookup_p1)
 
     mix = zipMap(mix, newdata, fnv(x, y))
 
@@ -197,23 +201,24 @@ proc hashimoto(header: Hash[256],
   result.value = keccak_256(concat)
 
 proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
-                      header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
+                      header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
 
-  let light: DatasetLookup = proc(x: Natural): Hash[512] = calc_data_set_item(cache, x)
   hashimoto(header,
             nonce,
             full_size,
-            light)
+            calc_data_set_item(cache, p),
+            calc_data_set_item(cache, p1),
+            result)
 
 proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
-                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect, inline.} =
+                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
   # TODO spec mentions full_size but I don't think we need it (retrieve it from dataset.len)
-  let full: DatasetLookup = proc(x: Natural): Hash[512] = dataset[x]
   hashimoto(header,
             nonce,
             full_size,
-            full)
-
+            dataset[int(p)],
+            dataset[int(p1)],
+            result)
 # ###############################################################################
 # Defining the seed hash
 
