@@ -7,7 +7,7 @@ srcDir        = "src"
 
 ### Dependencies
 
-requires "nim >= 0.17.2", "keccak_tiny >= 0.1.0"
+requires "nim >= 0.18.0", "keccak_tiny >= 0.1.0"
 
 proc test(name: string, lang: string = "c") =
   if not dirExists "build":
