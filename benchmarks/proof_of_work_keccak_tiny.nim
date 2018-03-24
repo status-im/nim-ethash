@@ -4,9 +4,8 @@
 import  math, endians,
         keccak_tiny
 
-import  ./private/[primes, conversion, functional, intmath]
-export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE # debug functions
-export keccak_tiny
+import  ../src/private/[primes, conversion, functional, intmath]
+import ../src/data_sizes
 
 # ###############################################################################
 # Definitions
@@ -47,7 +46,6 @@ proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
 
 # ###############################################################################
 # Fetch from lookup tables of 2048 epochs of data sizes and cache sizes
-import ./data_sizes
 
 proc get_datasize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} =
   data_sizes[block_number div EPOCH_LENGTH]

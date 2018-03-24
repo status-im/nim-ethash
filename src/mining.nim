@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import ./proof_of_work, ./private/casting
+import ./proof_of_work, ./private/conversion
 import endians, random, math
 
 proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =

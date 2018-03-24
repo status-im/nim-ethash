@@ -4,8 +4,6 @@
 
 # Pending https://github.com/alehander42/zero-functional/issues/6
 # A zip + map that avoids heap allocation
-import ./casting
-
 iterator enumerateZip[N: static[int], T, U](
                       a: array[N, T],
                       b: array[N, U]
@@ -28,10 +26,11 @@ template zipMap*[N: static[int], T, U](
       op
   ))
 
-  var result: array[N, outType]
+  {.pragma: align64, codegenDecl: "$# $# __attribute__((aligned(64)))".}
+  var result{.noInit, align64.}: array[N, outType]
 
   for i, x {.inject.}, y {.inject.} in enumerateZip(a, b):
-    {.unroll: 4.}
+    {.unroll: 4.} # This is a no-op at the moment
     result[i] = op
 
   result

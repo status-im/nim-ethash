@@ -7,9 +7,6 @@ proc as_u32_words*[N: static[int]](x: Hash[N]): array[N div 32, uint32] {.inline
   # Convert an hash to its uint32 representation
   cast[type result](x)
 
-type ByteArrayBE*[N: static[int]] = array[N, byte]
-  ## A byte array that stores bytes in big-endian order
-
 proc readHexChar(c: char): byte {.noSideEffect.}=
   ## Converts an hex char to a byte
   case c
@@ -19,7 +16,7 @@ proc readHexChar(c: char): byte {.noSideEffect.}=
   else:
     raise newException(ValueError, $c & "is not a hexademical character")
 
-proc hexToByteArrayBE*[N: static[int]](hexStr: string): ByteArrayBE[N] {.noSideEffect, noInit.}=
+proc hexToByteArrayBE*[N: static[int]](hexStr: string): array[N, byte] {.noSideEffect, noInit.}=
   ## Read an hex string and store it in a Byte Array in Big-Endian order
   var i = 0
   if hexStr[i] == '0' and (hexStr[i+1] == 'x' or hexStr[i+1] == 'X'):
@@ -44,7 +41,7 @@ proc hexToSeqBytesBE*(hexStr: string): seq[byte] {.noSideEffect.}=
     result[i] = hexStr[2*i].readHexChar shl 4 or hexStr[2*i+1].readHexChar
     inc(i)
 
-proc toHex*[N: static[int]](ba: ByteArrayBE[N]): string {.noSideEffect.}=
+proc toHex*[N: static[int]](ba: array[N, byte]): string {.noSideEffect.}=
   ## Convert a big-endian byte array to its hex representation
   ## Output is in lowercase
 
@@ -68,7 +65,7 @@ proc toHex*(ba: seq[byte]): string {.noSideEffect, noInit.}=
     result[2*i] = hexChars[int ba[i] shr 4 and 0xF]
     result[2*i+1] = hexChars[int ba[i] and 0xF]
 
-proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffect, noInit, inline.}=
+proc toByteArrayBE*[T: SomeInteger](num: T): array[T.sizeof, byte] {.noSideEffect, noInit, inline.}=
   ## Convert an int (in native host endianness) to a big-endian byte array
   # Note: only works on devel
 
@@ -81,5 +78,5 @@ proc toByteArrayBE*[T: SomeInteger](num: T): ByteArrayBE[T.sizeof] {.noSideEffec
     for i in 0 ..< N:
       result[i] = byte(num shr T((N-1-i) * 8))
 
-proc toByteArrayBE*[N: static[int]](x: Hash[N]): ByteArrayBE[N div 8] {.inline, noSideEffect, noInit.}=
+proc toByteArrayBE*[N: static[int]](x: Hash[N]): array[N div 8, byte] {.inline, noSideEffect, noInit.}=
   cast[type result](x.data)
