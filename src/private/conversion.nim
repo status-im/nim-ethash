@@ -1,9 +1,9 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import keccak_tiny
+import nimcrypto
 
-proc as_u32_words*[N: static[int]](x: Hash[N]): array[N div 32, uint32] {.inline, noSideEffect, noInit.}=
+proc as_u32_words*[bits: static[int]](x: MDigest[bits]): array[bits div 32, uint32] {.inline, noSideEffect, noInit.}=
   # Convert an hash to its uint32 representation
   cast[type result](x)
 
@@ -78,5 +78,5 @@ proc toByteArrayBE*[T: SomeInteger](num: T): array[T.sizeof, byte] {.noSideEffec
     for i in 0 ..< N:
       result[i] = byte(num shr T((N-1-i) * 8))
 
-proc toByteArrayBE*[N: static[int]](x: Hash[N]): array[N div 8, byte] {.inline, noSideEffect, noInit.}=
+proc toByteArrayBE*[bits: static[int]](x: MDigest[bits]): array[bits div 8, byte] {.inline, noSideEffect, noInit.}=
   cast[type result](x.data)

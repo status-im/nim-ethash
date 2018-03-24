@@ -2,11 +2,10 @@
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import  math, endians,
-        keccak_tiny
+        nimcrypto
 
 import  ./private/[primes, conversion, functional, intmath]
 export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE # debug functions
-export keccak_tiny
 
 # ###############################################################################
 # Definitions
@@ -58,17 +57,17 @@ proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} 
 # ###############################################################################
 # Cache generation
 
-proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
+proc mkcache*(cache_size: uint64, seed: MDigest[256]): seq[MDigest[512]] {.noSideEffect.}=
 
   # Cache size
   let n = int(cache_size div HASH_BYTES)
 
   # Sequentially produce the initial dataset
-  result = newSeq[Hash[512]](n)
-  result[0] = keccak512 seed.data
+  result = newSeq[MDigest[512]](n)
+  result[0] = keccak512.digest seed.data
 
   for i in 1 ..< n:
-    result[i] = keccak512 result[i-1].data
+    result[i] = keccak512.digest result[i-1].data
 
   # Use a low-round version of randmemohash
   for _ in 0 ..< CACHE_ROUNDS:
@@ -77,7 +76,7 @@ proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffec
         v = result[i].as_u32_words[0] mod n.uint32
         a = result[(i-1+n) mod n].data
         b = result[v.int].data
-      result[i] = keccak512 zipMap(a, b, x xor y)
+      result[i] = keccak512.digest zipMap(a, b, x xor y)
 
 # ###############################################################################
 # Data aggregation function
@@ -105,7 +104,7 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
 # ###############################################################################
 # Full dataset calculation
 
-proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
+proc calc_dataset_item*(cache: seq[MDigest[512]], i: Natural): MDigest[512] {.noSideEffect, noInit.} =
   let n = cache.len
   const r: uint32 = HASH_BYTES div WORD_BYTES
 
@@ -117,21 +116,21 @@ proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEf
     mix[0] = mix[0] xor i.uint32
   else:
     mix[high(mix)] = mix[high(mix)] xor i.uint32
-  result = keccak512 mix[]
+  result = keccak512.digest mix[]
 
   # FNV with a lots of random cache nodes based on i
   for j in 0'u32 ..< DATASET_PARENTS:
     let cache_index = fnv(i.uint32 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[cache_index.int mod n].as_u32_words, fnv(x, y))
 
-  result = keccak512 mix[]
+  result = keccak512.digest mix[]
 
 when defined(openmp):
   # Remove stacktraces when using OpenMP, heap alloc from strings will crash.
   {.push stacktrace: off.}
-proc calc_dataset*(full_size: Natural, cache: seq[Hash[512]]): seq[Hash[512]] =
+proc calc_dataset*(full_size: Natural, cache: seq[MDigest[512]]): seq[MDigest[512]] =
 
-  result = newSeq[Hash[512]](full_size div HASH_BYTES)
+  result = newSeq[MDigest[512]](full_size div HASH_BYTES)
   for i in `||`(0, result.len - 1, "simd"):
     # OpenMP loop
     result[i] = calc_dataset_item(cache, i)
@@ -143,9 +142,9 @@ when defined(openmp):
 # ###############################################################################
 # Main loop
 
-type HashimotoHash = tuple[mix_digest, value: Hash[256]]
+type HashimotoHash = tuple[mix_digest, value: MDigest[256]]
 
-template hashimoto(header: Hash[256],
+template hashimoto(header: MDigest[256],
               nonce: uint64,
               full_size: Natural,
               dataset_lookup_p: untyped,
@@ -161,7 +160,8 @@ template hashimoto(header: Hash[256],
   assert MIX_BYTES mod HASH_BYTES == 0
 
   # combine header+nonce into a 64 byte seed
-  var s{.noInit.}: Hash[512]
+  {.pragma: align64, codegenDecl: "$# $# __attribute__((aligned(64)))".}
+  var s{.align64, noInit.}: MDigest[512]
   let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
   let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
 
@@ -172,11 +172,11 @@ template hashimoto(header: Hash[256],
   littleEndian64(addr nonceLE, unsafeAddr nonce)
   s_bytes[][32..<40] = cast[array[8,byte]](nonceLE)
 
-  s = keccak_512 s_bytes[][0..<40]                  # TODO: Does this allocate a seq?
+  s = keccak_512.digest s_bytes[][0..<40]           # TODO: Does this slicing allocate a seq?
 
   # start the mix with replicated s
   assert MIX_BYTES div HASH_BYTES == 2
-  var mix{.noInit.}: array[32, uint32]
+  var mix{.align64, noInit.}: array[32, uint32]
   mix[0..<16] = s_words[]
   mix[16..<32] = s_words[]
 
@@ -203,10 +203,10 @@ template hashimoto(header: Hash[256],
   var concat{.noInit.}: array[64 + 32, byte]
   concat[0..<64] = s_bytes[]
   concat[64..<96] = cast[array[32, byte]](result.mix_digest)
-  result.value = keccak_256(concat)
+  result.value = keccak_256.digest concat
 
-proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
-                      header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
+proc hashimoto_light*(full_size:Natural, cache: seq[MDigest[512]],
+                      header: MDigest[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
 
   hashimoto(header,
             nonce,
@@ -215,8 +215,8 @@ proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
             calc_data_set_item(cache, p1),
             result)
 
-proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
-                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
+proc hashimoto_full*(full_size:Natural, dataset: seq[MDigest[512]],
+                    header: MDigest[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
   # TODO spec mentions full_size but I don't think we need it (retrieve it from dataset.len)
   hashimoto(header,
             nonce,
@@ -227,6 +227,6 @@ proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
 # ###############################################################################
 # Defining the seed hash
 
-proc get_seedhash*(block_number: uint64): Hash[256] {.noSideEffect.} =
+proc get_seedhash*(block_number: uint64): MDigest[256] {.noSideEffect.} =
   for i in 0 ..< int(block_number div EPOCH_LENGTH):
-    result = keccak256 result.data
+    result = keccak256.digest result.data
