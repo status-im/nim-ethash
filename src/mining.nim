@@ -1,8 +1,8 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import ./proof_of_work, ./private/casting
-import endians, random, math
+import ./proof_of_work, ./private/conversion
+import endians, random, math, nimcrypto
 
 proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
   ## Multiplication in extended precision
@@ -63,8 +63,8 @@ proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
 proc isValid(nonce: uint64,
             difficulty: uint64,
             full_size: Natural,
-            dataset: seq[Hash[512]],
-            header: Hash[256]): bool {.noSideEffect.}=
+            dataset: seq[MDigest[512]],
+            header: MDigest[256]): bool {.noSideEffect.}=
   # Boundary is 2^256/difficulty
   # A valid nonce will have: hashimoto < 2^256/difficulty
   # We can't represent 2^256 as an uint256 so as a workaround we use:
@@ -113,14 +113,13 @@ proc isValid(nonce: uint64,
 
   result = carry == 0
 
+# const High_uint64 = not 0'u64 # TODO: Nim random does not work on uint64 range.
 
-
-proc mine*(full_size: Natural, dataset: seq[Hash[512]], header: Hash[256], difficulty: uint64): uint64 =
+proc mine*(full_size: Natural, dataset: seq[MDigest[512]], header: MDigest[256], difficulty: uint64): uint64 =
   # Returns a valid nonce
 
   randomize()                       # Start with a completely random seed
-  result = uint64 random(high(int)) # TODO: Nim random does not work on uint64 range.
-                                    #       Also random is deprecated in devel and does not include the end of the range.
+  result = uint64 rand(high(int))   # TODO: Nim rand does not work on uint64 range.
 
   while not result.isValid(difficulty, full_size, dataset, header):
     inc(result) # we rely on uint overflow (mod 2^64) here.

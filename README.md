@@ -1,6 +1,6 @@
 **Nim Ethash**
 
-[![Build Status (Travis)](https://img.shields.io/travis/status-im/nim-ethash/master.svg?label=Linux%20/%20macOS "Linux/macOS build status (Travis)")](https://travis-ci.org/status-im/nim-ethash)[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) ![Stability: experimental](https://img.shields.io/badge/stability-experimental-orange.svg)
+[![Build Status (Travis)](https://img.shields.io/travis/status-im/nim-ethash/master.svg?label=Linux%20/%20macOS "Linux/macOS build status (Travis)")](https://travis-ci.org/status-im/nim-ethash)[![License: Apache](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) ![Stability: experimental](https://img.shields.io/badge/stability-experimental-orange.svg)
 
 # Introduction
 A pure-Nim implementation of Ethash, the Ethereum proof of work

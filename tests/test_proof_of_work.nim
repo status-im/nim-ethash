@@ -1,8 +1,7 @@
 # Copyright (c) 2018 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import  ../src/ethash, unittest, strutils, algorithm, random, sequtils,
-        keccak_tiny
+import  ../src/ethash, unittest, strutils, algorithm, random, sequtils, nimcrypto
 
 
 suite "Base hashing algorithm":
@@ -21,8 +20,8 @@ suite "Base hashing algorithm":
     let
       input = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       expected = "2b5ddf6f4d21c23de216f44d5e4bdc68e044b71897837ea74c83908be7037cd7".toUpperASCII
-      actual = toUpperASCII($input.keccak_256) # using keccak built-in conversion proc
-      actual2 = cast[array[256 div 8, byte]](input.keccak_256).toHex.toUpperAscii
+      actual = toUpperASCII($keccak256.digest(input)) # using keccak built-in conversion proc
+      actual2 = cast[array[256 div 8, byte]](keccak_256.digest(input)).toHex.toUpperAscii
 
     check: expected == actual
     check: expected == actual2
@@ -32,8 +31,8 @@ suite "Base hashing algorithm":
     let
       input = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       expected = "0be8a1d334b4655fe58c6b38789f984bb13225684e86b20517a55ab2386c7b61c306f25e0627c60064cecd6d80cd67a82b3890bd1289b7ceb473aad56a359405".toUpperASCII
-      actual = toUpperASCII($input.keccak_512) # using keccak built-in conversion proc
-      actual2 = cast[array[512 div 8, byte]](input.keccak_512).toHex.toUpperAscii
+      actual = toUpperASCII($keccak512.digest(input)) # using keccak built-in conversion proc
+      actual2 = cast[array[512 div 8, byte]](keccak_512.digest(input)).toHex.toUpperAscii
 
     check: expected == actual
     check: expected == actual2
@@ -117,7 +116,7 @@ suite "Cache initialization":
   # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/python/test_pyethash.py#L31-L36
   test "Mkcache":
     let actual_str = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    var actual_hash: Hash[256]
+    var actual_hash: MDigest[256]
     copyMem(addr actual_hash, unsafeAddr actual_str[0], 256 div 8)
 
     let
@@ -136,10 +135,10 @@ suite "Seed hash":
     check: $get_seedhash(0) == zeroHex
 
   test "Seed hash of the next 2048 epochs (2048 * 30000 blocks)":
-    var expected: Hash[256]
+    var expected: MDigest[256]
     for i in countup(0'u32, 30000 * 2048, 30000):
       check: get_seedhash(i) == expected
-      expected = keccak_256(expected.data)
+      expected = keccak_256.digest(expected.data)
 
 suite "Dagger hashimoto computation":
     # We can't replicate Python's dynamic typing here
@@ -151,11 +150,11 @@ suite "Dagger hashimoto computation":
     cache_str = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     header_str = "~~~~~X~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-  var cache_hash: Hash[256]
+  var cache_hash: MDigest[256]
   copyMem(addr cache_hash, unsafeAddr cache_str[0], 256 div 8)
   let cache = mkcache(cache_size, cache_hash)
 
-  var header: Hash[256]
+  var header: MDigest[256]
   copyMem(addr header, unsafeAddr header_str[0], 256 div 8)
 
   let full = calc_dataset(full_size, cache)
@@ -168,7 +167,7 @@ suite "Dagger hashimoto computation":
 
   test "Real dataset and recomputation from cache matches":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L360-L374
-    for i in 0 ..< full_size div sizeof(Hash[512]):
+    for i in 0 ..< full_size div sizeof(MDigest[512]):
       for j in 0 ..< 32:
         let expected = calc_dataset_item(cache, j)
         check: full[j] == expected
@@ -183,7 +182,7 @@ suite "Dagger hashimoto computation":
     let full_result = hashimoto_full(full_size, dataset, header, 0)
 
     # Check not null
-    var zero_hash : Hash[256]
+    var zero_hash : MDigest[256]
     check: light_result.mix_digest != zero_hash
     check: light_result.value      != zero_hash
     check: light_result == full_result
@@ -194,7 +193,7 @@ suite "Real blocks test":
     # POC-9 testnet, epoch 0
     let blck = 22'u # block number
     let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
-    let header = cast[Hash[256]](
+    let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("372eca2454ead349c3df0ab5d00b0b706b23e49d469387db91811cee0358fc6d")
     )
 
@@ -205,10 +204,10 @@ suite "Real blocks test":
       0x495732e0ed7a801c'u
     )
 
-    check: light.value == cast[Hash[256]](
+    check: light.value == cast[MDigest[256]](
       hexToByteArrayBE[32]("00000b184f1fdd88bfd94c86c39e65db0c36144d5e43f745f722196e730cb614")
     )
-    check: light.mixDigest == cast[Hash[256]](
+    check: light.mixDigest == cast[MDigest[256]](
       hexToByteArrayBE[32]("2f74cdeb198af0b9abe65d22d372e22fb2d474371774a9583c1cc427a07939f5")
     )
 
@@ -217,7 +216,7 @@ suite "Real blocks test":
     # POC-9 testnet, epoch 1
     let blck = 30001'u # block number
     let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
-    let header = cast[Hash[256]](
+    let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("7e44356ee3441623bc72a683fd3708fdf75e971bbe294f33e539eedad4b92b34")
     )
 
@@ -228,7 +227,7 @@ suite "Real blocks test":
       0x318df1c8adef7e5e'u
     )
 
-    check: light.mixDigest == cast[Hash[256]](
+    check: light.mixDigest == cast[MDigest[256]](
       hexToByteArrayBE[32]("144b180aad09ae3c81fb07be92c8e6351b5646dda80e6844ae1b697e55ddde84")
     )
 
@@ -237,7 +236,7 @@ suite "Real blocks test":
     # POC-9 testnet, epoch 2
     let blck = 60000'u # block number
     let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
-    let header = cast[Hash[256]](
+    let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("5fc898f16035bf5ac9c6d9077ae1e3d5fc1ecc3c9fd5bee8bb00e810fdacbaa0")
     )
 
@@ -248,6 +247,6 @@ suite "Real blocks test":
       0x50377003e5d830ca'u
     )
 
-    check: light.mixDigest == cast[Hash[256]](
+    check: light.mixDigest == cast[MDigest[256]](
       hexToByteArrayBE[32]("ab546a5b73c452ae86dadd36f0ed83a6745226717d3798832d1b20b489e82063")
     )
