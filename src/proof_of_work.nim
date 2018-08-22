@@ -34,7 +34,7 @@ proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
   while (let dm = divmod(result, HASH_BYTES);
         dm.rem == 0 and not dm.quot.isPrime):
         # In a static lang, checking that the result of a division is prime
-        # Means checking that reminder == 0 and quotient is prime
+        # means checking that remainder == 0 and quotient is prime
     result -= 2 * HASH_BYTES
 
 proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
@@ -132,7 +132,7 @@ proc calc_dataset*(full_size: Natural, cache: seq[MDigest[512]]): seq[MDigest[51
 
   result = newSeq[MDigest[512]](full_size div HASH_BYTES)
   for i in `||`(0, result.len - 1, "simd"):
-    # OpenMP loop
+    # OpenMP parallel loop
     result[i] = calc_dataset_item(cache, i)
 
 when defined(openmp):
@@ -162,15 +162,15 @@ template hashimoto(header: MDigest[256],
   # combine header+nonce into a 64 byte seed
   {.pragma: align64, codegenDecl: "$# $# __attribute__((aligned(64)))".}
   var s{.align64, noInit.}: MDigest[512]
-  let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
-  let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
+  let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias to interpret s as a byte array
+  let s_words = cast[ptr array[16, uint32]](addr s) # Alias to interpret s as an uint32 array
 
   s_bytes[][0..<32] = header.data                   # We first populate the first 40 bytes of s with the concatenation
                                                     # In template we need to dereference first otherwise it's not considered as var
 
   var nonceLE{.noInit.}: array[8, byte]             # the nonce should be concatenated with its LITTLE ENDIAN representation
   littleEndian64(addr nonceLE, unsafeAddr nonce)
-  s_bytes[][32..<40] = cast[array[8,byte]](nonceLE)
+  s_bytes[][32..<40] = nonceLE
 
   s = keccak_512.digest s_bytes[][0..<40]           # TODO: Does this slicing allocate a seq?
 
