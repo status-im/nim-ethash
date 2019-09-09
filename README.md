@@ -1,7 +1,7 @@
 # ethash
 
 [![Build Status (Travis)](https://img.shields.io/travis/status-im/nim-ethash/master.svg?label=Linux%20/%20macOS "Linux/macOS build status (Travis)")](https://travis-ci.org/status-im/nim-ethash)
-[![Windows build status (Appveyor)](https://img.shields.io/appveyor/ci/nimbus/nim-ethash/master.svg?label=Windows "Windows build status (Appveyor)")](https://ci.appveyor.com/project/nimbus/nim-ethash)
+[![Build status](https://ci.appveyor.com/api/projects/status/am2wc94jm2qo7il3/branch/master?svg=true)](https://ci.appveyor.com/project/nimbus/nim-ethash-ia55s/branch/master)
 [![License: Apache](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Stability: experimental](https://img.shields.io/badge/stability-experimental-orange.svg)
