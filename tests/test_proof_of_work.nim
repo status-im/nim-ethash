@@ -139,7 +139,6 @@ suite "Seed hash":
       check: get_seedhash(i) == expected
       expected = keccak_256.digest(expected.data)
 
-
 suite "Dagger hashimoto computation":
     # We can't replicate Python's dynamic typing here
     # As Nim expects stack allocated Hash and a string is allocated on the heap

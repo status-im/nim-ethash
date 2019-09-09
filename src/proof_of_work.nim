@@ -99,7 +99,7 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
 
   # So casting to uint32 should do the modulo and masking just fine
 
-  v1.uint32 * FNV_PRIME xor v2.uint32
+  (v1.uint32 * FNV_PRIME) xor v2.uint32
 
 # ###############################################################################
 # Full dataset calculation
