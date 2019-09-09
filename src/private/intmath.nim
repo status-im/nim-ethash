@@ -8,12 +8,17 @@
 const withBuiltins = defined(gcc) or defined(clang)
 
 when withBuiltins:
-  proc builtin_clz(n: cuint): cint {.importc: "__builtin_clz", nodecl.}
-  proc builtin_clz(n: culong): cint {.importc: "__builtin_clzl", nodecl.}
-  proc builtin_clz(n: culonglong): cint {.importc: "__builtin_clzll", nodecl.}
-  type TbuiltinSupported = cuint or culong or culonglong
-    ## Count Leading Zero with optimized builtins routines from GCC/Clang
-    ## Warning ⚠: if n = 0, clz is undefined
+  when not defined(windows):
+    proc builtin_clz(n: cuint): cint {.importc: "__builtin_clz", nodecl.}
+    proc builtin_clz(n: culong): cint {.importc: "__builtin_clzl", nodecl.}
+    proc builtin_clz(n: culonglong): cint {.importc: "__builtin_clzll", nodecl.}
+    type TbuiltinSupported = cuint or culong or culonglong
+      ## Count Leading Zero with optimized builtins routines from GCC/Clang
+      ## Warning ⚠: if n = 0, clz is undefined
+  else:
+    proc builtin_clz(n: culong): cint {.importc: "__builtin_clzl", nodecl.}
+    proc builtin_clz(n: culonglong): cint {.importc: "__builtin_clzll", nodecl.}
+    type TbuiltinSupported = culong or culonglong
 
 proc bit_length*[T: SomeInteger](n: T): T =
   ## Calculates how many bits are necessary to represent the number

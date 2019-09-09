@@ -13,10 +13,10 @@ export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE # debug functions
 const
   REVISION* = 23                     # Based on spec revision 23
   WORD_BYTES = 4                     # bytes in word - in Nim we use 64 bits words # TODO check that
-  DATASET_BYTES_INIT* = 2'u^30       # bytes in dataset at genesis
-  DATASET_BYTES_GROWTH* = 2'u^23     # dataset growth per epoch
-  CACHE_BYTES_INIT* = 2'u^24         # bytes in cache at genesis
-  CACHE_BYTES_GROWTH* = 2'u^17       # cache growth per epoch
+  DATASET_BYTES_INIT* = 2'u64^30       # bytes in dataset at genesis
+  DATASET_BYTES_GROWTH* = 2'u64^23     # dataset growth per epoch
+  CACHE_BYTES_INIT* = 2'u64^24         # bytes in cache at genesis
+  CACHE_BYTES_GROWTH* = 2'u64^17       # cache growth per epoch
   CACHE_MULTIPLIER = 1024            # Size of the DAG relative to the cache
   EPOCH_LENGTH* = 30000              # blocks per epoch
   MIX_BYTES* = 128                   # width of mix
@@ -28,7 +28,7 @@ const
 # ###############################################################################
 # Parameters
 
-proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
+proc get_cache_size*(block_number: uint64): uint64 {.noSideEffect.}=
   result = CACHE_BYTES_INIT + CACHE_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= HASH_BYTES
   while (let dm = divmod(result, HASH_BYTES);
@@ -37,7 +37,7 @@ proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
         # means checking that remainder == 0 and quotient is prime
     result -= 2 * HASH_BYTES
 
-proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
+proc get_data_size*(block_number: uint64): uint64 {.noSideEffect.}=
   result = DATASET_BYTES_INIT + DATASET_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= MIX_BYTES
   while (let dm = divmod(result, MIX_BYTES);
@@ -120,8 +120,8 @@ proc calc_dataset_item*(cache: seq[MDigest[512]], i: Natural): MDigest[512] {.no
 
   # FNV with a lots of random cache nodes based on i
   for j in 0'u32 ..< DATASET_PARENTS:
-    let cache_index = fnv(i.uint32 xor j, mix[j mod r])
-    mix[] = zipMap(mix[], cache[cache_index.int mod n].as_u32_words, fnv(x, y))
+    let cacheIndex = fnv(i.uint32 xor j, mix[j mod r])
+    mix[] = zipMap(mix[], cache[int(cacheIndex mod n.uint32)].as_u32_words, fnv(x, y))
 
   result = keccak512.digest mix[]
 

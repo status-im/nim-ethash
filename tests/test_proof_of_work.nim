@@ -3,7 +3,6 @@
 
 import  ../src/ethash, unittest, strutils, algorithm, random, sequtils, nimcrypto
 
-
 suite "Base hashing algorithm":
   test "FNV hashing":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L104-L116
