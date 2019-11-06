@@ -116,14 +116,14 @@ proc calc_dataset_item*(cache: seq[MDigest[512]], i: Natural): MDigest[512] {.no
     mix[0] = mix[0] xor i.uint32
   else:
     mix[high(mix)] = mix[high(mix)] xor i.uint32
-  result = keccak512.digest mix[]
+  result = keccak512.digest result.data
 
   # FNV with a lots of random cache nodes based on i
   for j in 0'u32 ..< DATASET_PARENTS:
     let cacheIndex = fnv(i.uint32 xor j, mix[j mod r])
     mix[] = zipMap(mix[], cache[int(cacheIndex mod n.uint32)].as_u32_words, fnv(x, y))
 
-  result = keccak512.digest mix[]
+  result = keccak512.digest result.data
 
 when defined(openmp):
   # Remove stacktraces when using OpenMP, heap alloc from strings will crash.
