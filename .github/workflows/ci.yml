@@ -8,6 +8,7 @@ jobs:
       max-parallel: 20
       matrix:
         test_lang: [c]
+        branch: [version-1-6]
         target:
           - os: linux
             cpu: amd64
@@ -17,24 +18,22 @@ jobs:
             cpu: amd64
           - os: windows
             cpu: amd64
-          - os: windows
-            cpu: i386
         include:
           - target:
               os: linux
-            builder: ubuntu-18.04
+            builder: ubuntu-20.04
           - target:
               os: macos
-            builder: macos-10.15
+            builder: macos-11
           - target:
               os: windows
-            builder: windows-2019
+            builder: windows-latest
 
-    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.test_lang }}'
+    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.test_lang }}-(Nim ${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
     steps:
       - name: Checkout nim-ethash
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: nim-ethash
           submodules: false
@@ -62,7 +61,7 @@ jobs:
       - name: Restore MinGW-W64 (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-mingw-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: external/mingw-${{ matrix.target.cpu }}
           key: 'mingw-${{ matrix.target.cpu }}'
@@ -70,7 +69,7 @@ jobs:
       - name: Restore Nim DLLs dependencies (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-dlls-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: external/dlls-${{ matrix.target.cpu }}
           key: 'dlls-${{ matrix.target.cpu }}'
@@ -120,11 +119,11 @@ jobs:
             git ls-remote "https://github.com/$1" "${2:-HEAD}" | cut -f 1
           }
           nbsHash=$(getHash status-im/nimbus-build-system)
-          echo "::set-output name=nimbus_build_system::$nbsHash"
+          echo "nimbus_build_system=$nbsHash" >> $GITHUB_OUTPUT
 
       - name: Restore prebuilt Nim from cache
         id: nim-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: NimBinaries
           key: '${{ matrix.test_lang }}-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nimbus_build_system }}'
@@ -143,7 +142,9 @@ jobs:
           else
             MAKE_CMD="make"
           fi
-          env MAKE="$MAKE_CMD -j2" ARCH_OVERRIDE=$PLATFORM CC=gcc bash build_nim.sh nim csources dist/nimble NimBinaries
+          env MAKE="$MAKE_CMD -j2" ARCH_OVERRIDE=$PLATFORM NIM_COMMIT=${{ matrix.branch }} \
+            QUICK_AND_DIRTY_COMPILER=1 QUICK_AND_DIRTY_NIMBLE=1 CC=gcc \
+            bash build_nim.sh nim csources dist/nimble NimBinaries
           echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run nim-ethash tests

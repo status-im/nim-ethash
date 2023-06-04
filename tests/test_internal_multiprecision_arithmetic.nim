@@ -11,8 +11,8 @@ suite "[Internal] Testing multi-precision arithmetic":
     randomize(42) # random seed for reproducibility
     for _ in 0 ..< 10_000_000:
       let
-        a = random(high(int)).uint64
-        b = random(high(int)).uint64
+        a = rand(high(int)).uint64
+        b = rand(high(int)).uint64
 
       check: a * b == mulCarry(a, b).unit
 

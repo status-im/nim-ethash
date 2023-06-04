@@ -24,8 +24,8 @@ proc bit_length*[T: SomeInteger](n: T): T =
   ## Calculates how many bits are necessary to represent the number
 
   when withBuiltins and T is TbuiltinSupported:
-    result = if n == T(0): 0                    # Removing this branch would make divmod 4x faster :/
-             else: T.sizeof * 8 - builtin_clz(n)
+    result = if n == T(0): 0.T                    # Removing this branch would make divmod 4x faster :/
+             else: T(T.sizeof) * 8.T - builtin_clz(n).T
 
   else:
     var x = n
