@@ -7,3 +7,4 @@ build/
 *.dylib
 *.a
 *.exe
+nimble.paths

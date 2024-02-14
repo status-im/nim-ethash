@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import  math, endians,
@@ -13,11 +13,11 @@ export toHex, hexToByteArrayBE, hexToSeqBytesBE, toByteArrayBE # debug functions
 const
   REVISION* = 23                     # Based on spec revision 23
   WORD_BYTES = 4                     # bytes in word - in Nim we use 64 bits words # TODO check that
-  DATASET_BYTES_INIT* = 2'u64^30       # bytes in dataset at genesis
-  DATASET_BYTES_GROWTH* = 2'u64^23     # dataset growth per epoch
-  CACHE_BYTES_INIT* = 2'u64^24         # bytes in cache at genesis
-  CACHE_BYTES_GROWTH* = 2'u64^17       # cache growth per epoch
-  CACHE_MULTIPLIER = 1024            # Size of the DAG relative to the cache
+  DATASET_BYTES_INIT* = 2'u64^30     # bytes in dataset at genesis
+  DATASET_BYTES_GROWTH* = 2'u64^23   # dataset growth per epoch
+  CACHE_BYTES_INIT* = 2'u64^24       # bytes in cache at genesis
+  CACHE_BYTES_GROWTH* = 2'u64^17     # cache growth per epoch
+  CACHE_MULTIPLIER* = 1024           # Size of the DAG relative to the cache
   EPOCH_LENGTH* = 30000              # blocks per epoch
   MIX_BYTES* = 128                   # width of mix
   HASH_BYTES* = 64                   # hash length in bytes
@@ -31,7 +31,7 @@ const
 proc get_cache_size*(block_number: uint64): uint64 {.noSideEffect.}=
   result = CACHE_BYTES_INIT + CACHE_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= HASH_BYTES
-  while (let dm = divmod(result, HASH_BYTES);
+  while (let dm = intmath.divmod(result, HASH_BYTES);
         dm.rem == 0 and not dm.quot.isPrime):
         # In a static lang, checking that the result of a division is prime
         # means checking that remainder == 0 and quotient is prime
@@ -40,7 +40,7 @@ proc get_cache_size*(block_number: uint64): uint64 {.noSideEffect.}=
 proc get_data_size*(block_number: uint64): uint64 {.noSideEffect.}=
   result = DATASET_BYTES_INIT + DATASET_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= MIX_BYTES
-  while (let dm = divmod(result, MIX_BYTES);
+  while (let dm = intmath.divmod(result, MIX_BYTES);
         dm.rem == 0 and not dm.quot.isPrime):
     result -= 2 * MIX_BYTES
 

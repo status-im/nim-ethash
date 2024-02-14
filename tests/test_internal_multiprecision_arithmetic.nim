@@ -3,7 +3,7 @@
 
 include ../src/mining
 
-import unittest, random
+import unittest
 
 suite "[Internal] Testing multi-precision arithmetic":
   test "Multi-Precision multiplication gives the proper unit (modulo 2^64)":

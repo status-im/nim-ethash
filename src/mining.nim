@@ -1,8 +1,8 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
-import ./proof_of_work, ./private/conversion
-import endians, random, math, nimcrypto
+import ./proof_of_work
+import random, math, nimcrypto
 
 proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
   ## Multiplication in extended precision
