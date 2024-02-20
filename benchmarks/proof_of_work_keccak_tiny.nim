@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import  math, endians,
@@ -28,7 +28,7 @@ const
 # ###############################################################################
 # Parameters
 
-proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
+func get_cache_size*(block_number: uint): uint =
   result = CACHE_BYTES_INIT + CACHE_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= HASH_BYTES
   while (let dm = divmod(result, HASH_BYTES);
@@ -37,7 +37,7 @@ proc get_cache_size*(block_number: uint): uint {.noSideEffect.}=
         # Means checking that reminder == 0 and quotient is prime
     result -= 2 * HASH_BYTES
 
-proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
+func get_data_size*(block_number: uint): uint =
   result = DATASET_BYTES_INIT + DATASET_BYTES_GROWTH * (block_number div EPOCH_LENGTH)
   result -= MIX_BYTES
   while (let dm = divmod(result, MIX_BYTES);
@@ -47,16 +47,16 @@ proc get_data_size*(block_number: uint): uint {.noSideEffect.}=
 # ###############################################################################
 # Fetch from lookup tables of 2048 epochs of data sizes and cache sizes
 
-proc get_datasize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+func get_datasize_lut*(block_number: Natural): uint64 {.inline.} =
   data_sizes[block_number div EPOCH_LENGTH]
 
-proc get_cachesize_lut*(block_number: Natural): uint64 {.noSideEffect, inline.} =
+func get_cachesize_lut*(block_number: Natural): uint64 {.inline.} =
   cache_sizes[block_number div EPOCH_LENGTH]
 
 # ###############################################################################
 # Cache generation
 
-proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffect.}=
+func mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] =
 
   # Cache size
   let n = int(cache_size div HASH_BYTES)
@@ -82,7 +82,7 @@ proc mkcache*(cache_size: uint64, seed: Hash[256]): seq[Hash[512]] {.noSideEffec
 
 const FNV_PRIME = 0x01000193
 
-proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffect.}=
+func fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline.}=
 
   # Original formula is ((v1 * FNV_PRIME) xor v2) mod 2^32
   # However contrary to Python and depending on the type T,
@@ -103,7 +103,7 @@ proc fnv*[T: SomeUnsignedInt or Natural](v1, v2: T): uint32 {.inline, noSideEffe
 # ###############################################################################
 # Full dataset calculation
 
-proc calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noSideEffect, noInit.} =
+func calc_dataset_item*(cache: seq[Hash[512]], i: Natural): Hash[512] {.noinit.} =
   let n = cache.len
   const r: uint32 = HASH_BYTES div WORD_BYTES
 
@@ -159,14 +159,14 @@ template hashimoto(header: Hash[256],
   assert MIX_BYTES mod HASH_BYTES == 0
 
   # combine header+nonce into a 64 byte seed
-  var s{.noInit.}: Hash[512]
+  var s{.noinit.}: Hash[512]
   let s_bytes = cast[ptr array[64, byte]](addr s)   # Alias for to interpret s as a byte array
   let s_words = cast[ptr array[16, uint32]](addr s) # Alias for to interpret s as an uint32 array
 
   s_bytes[][0..<32] = header.data                   # We first populate the first 40 bytes of s with the concatenation
                                                     # In template we need to dereference first otherwise it's not considered as var
 
-  var nonceLE{.noInit.}: array[8, byte]             # the nonce should be concatenated with its LITTLE ENDIAN representation
+  var nonceLE{.noinit.}: array[8, byte]             # the nonce should be concatenated with its LITTLE ENDIAN representation
   littleEndian64(addr nonceLE, unsafeAddr nonce)
   s_bytes[][32..<40] = cast[array[8,byte]](nonceLE)
 
@@ -174,7 +174,7 @@ template hashimoto(header: Hash[256],
 
   # start the mix with replicated s
   assert MIX_BYTES div HASH_BYTES == 2
-  var mix{.noInit.}: array[32, uint32]
+  var mix{.noinit.}: array[32, uint32]
   mix[0..<16] = s_words[]
   mix[16..<32] = s_words[]
 
@@ -184,7 +184,7 @@ template hashimoto(header: Hash[256],
     let p1{.inject.} = p + 1
 
     # Unrolled: for j in range(MIX_BYTES / HASH_BYTES): => for j in 0 ..< 2
-    var newdata{.noInit.}: type mix
+    var newdata{.noinit.}: type mix
     newdata[0..<16] = cast[array[16, uint32]](dataset_lookup_p)
     newdata[16..<32] = cast[array[16, uint32]](dataset_lookup_p1)
 
@@ -198,13 +198,13 @@ template hashimoto(header: Hash[256],
   for i in countup(0, mix.len - 1, 4):
     cmix[i div 4] = mix[i].fnv(mix[i+1]).fnv(mix[i+2]).fnv(mix[i+3])
 
-  var concat{.noInit.}: array[64 + 32, byte]
+  var concat{.noinit.}: array[64 + 32, byte]
   concat[0..<64] = s_bytes[]
   concat[64..<96] = cast[array[32, byte]](result.mix_digest)
   result.value = keccak_256(concat)
 
-proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
-                      header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
+func hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
+                      header: Hash[256], nonce: uint64): HashimotoHash =
 
   hashimoto(header,
             nonce,
@@ -213,8 +213,8 @@ proc hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
             calc_data_set_item(cache, p1),
             result)
 
-proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
-                    header: Hash[256], nonce: uint64): HashimotoHash {.noSideEffect.} =
+func hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
+                    header: Hash[256], nonce: uint64): HashimotoHash =
   # TODO spec mentions full_size but I don't think we need it (retrieve it from dataset.len)
   hashimoto(header,
             nonce,
@@ -225,6 +225,6 @@ proc hashimoto_full*(full_size:Natural, dataset: seq[Hash[512]],
 # ###############################################################################
 # Defining the seed hash
 
-proc get_seedhash*(block_number: uint64): Hash[256] {.noSideEffect.} =
+func get_seedhash*(block_number: uint64): Hash[256] =
   for i in 0 ..< int(block_number div EPOCH_LENGTH):
     result = keccak256 result.data

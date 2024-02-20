@@ -1,12 +1,12 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 when defined(openmp):
-  {.passC: "-fopenmp".}
-  {.passL: "-fopenmp".}
+  {.passc: "-fopenmp".}
+  {.passl: "-fopenmp".}
 
 when defined(march_native):
-  {.passC: "-march=native".}
+  {.passc: "-march=native".}
 
 import ./proof_of_work
 export proof_of_work

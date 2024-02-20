@@ -6,7 +6,7 @@ import ./internal
 
 
 ###############################################
-proc toHex*[N: static[int]](ba: array[N, byte]): string {.noSideEffect.}=
+func toHex*[N: static[int]](ba: array[N, byte]): string =
   ## Convert a big-endian byte array to its hex representation
   ## Output is in lowercase
   ##
@@ -19,7 +19,7 @@ proc toHex*[N: static[int]](ba: array[N, byte]): string {.noSideEffect.}=
     result[2*i+1] = hexChars[int ba[i] and 0xF]
 
 
-proc readHexChar(c: char): byte {.noSideEffect.}=
+func readHexChar(c: char): byte =
   ## Converts an hex char to a byte
   case c
   of '0'..'9': result = byte(ord(c) - ord('0'))
@@ -28,7 +28,7 @@ proc readHexChar(c: char): byte {.noSideEffect.}=
   else:
     raise newException(ValueError, $c & "is not a hexademical character")
 
-proc hexToByteArrayBE*[N: static[int]](hexStr: string): array[N, byte] {.noSideEffect, noInit.}=
+func hexToByteArrayBE*[N: static[int]](hexStr: string): array[N, byte] {.noinit.}=
   ## Read an hex string and store it in a Byte Array in Big-Endian order
   var i = 0
   if hexStr[i] == '0' and (hexStr[i+1] == 'x' or hexStr[i+1] == 'X'):

@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 
@@ -27,7 +27,7 @@ template zipMap*[N: static[int], T, U](
   ))
 
   {.pragma: align64, codegenDecl: "$# $# __attribute__((aligned(64)))".}
-  var result{.noInit, align64.}: array[N, outType]
+  var result{.noinit, align64.}: array[N, outType]
 
   for i, x {.inject.}, y {.inject.} in enumerateZip(a, b):
     {.unroll: 4.} # This is a no-op at the moment

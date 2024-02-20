@@ -1,6 +1,6 @@
 # From https://github.com/numforge/number-theory/
 # MIT Licence
-# Copyright (c) 2016 Mamy Ratsimbazafy
+# Copyright (c) 2016-2024 Mamy Ratsimbazafy
 
 # ########### Number of bits to represent a number
 
@@ -59,16 +59,16 @@ type
 proc ldiv(a, b: clong): ldiv_t {.importc: "ldiv", header: "<stdlib.h>".}
 proc lldiv(a, b: clonglong): lldiv_t {.importc: "lldiv", header: "<stdlib.h>".}
 
-proc divmod*(a, b: int32): tuple[quot, rem: clong] {.inline, noSideEffect, noInit.}=
+func divmod*(a, b: int32): tuple[quot, rem: clong] {.inline, noinit.}=
   ## Compute quotient and reminder of integer division in a single intrinsics operation
   # TODO: changing clong to int32 poses an issue for some reason
   cast[type result](ldiv(a,b))
 
-proc divmod*(a, b: int64): tuple[quot, rem: int64] {.inline, noSideEffect, noInit.}=
+func divmod*(a, b: int64): tuple[quot, rem: int64] {.inline, noinit.}=
   ## Compute quotient and reminder of integer division in a single intrinsicsoperation
   cast[type result](lldiv(a,b))
 
-proc divmod*[T: SomeUnsignedInt](a, b: T): tuple[quot, rem: T] {.inline, noSideEffect, noInit.}=
+func divmod*[T: SomeUnsignedInt](a, b: T): tuple[quot, rem: T] {.inline, noinit.}=
   # There is no single instruction for unsigned ints
   # Hopefully the compiler does its work properly
   (a div b, a mod b)
