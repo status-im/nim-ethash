@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import  ../src/ethash, unittest, strutils, algorithm, random, sequtils, nimcrypto
@@ -43,8 +43,8 @@ suite "Endianness (not implemented)":
 suite "Genesis parameters":
   # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L155-L180
   let
-    full_size = get_datasize(0)
-    cache_size = get_cachesize(0)
+    full_size = get_data_size(0)
+    cache_size = get_cache_size(0)
 
   test "Full dataset size should be less or equal DATASET_BYTES_INIT":
     check: full_size <= DATASET_BYTES_INIT
@@ -79,19 +79,19 @@ suite "Epoch change":
     check: get_cache_size(EPOCH_LENGTH * 2048 - 1) == 285081536'u
 
   test "Full dataset size at the change of epochs - Look-up tables":
-    check: get_data_size_lut(EPOCH_LENGTH - 1) == 1073739904'u
-    check: get_data_size_lut(EPOCH_LENGTH)     == 1082130304'u
-    check: get_data_size_lut(EPOCH_LENGTH + 1) == 1082130304'u
-    check: get_data_size_lut(EPOCH_LENGTH * 2046) == 18236833408'u
-    check: get_data_size_lut(EPOCH_LENGTH * 2047) == 18245220736'u
+    check: get_datasize_lut(EPOCH_LENGTH - 1) == 1073739904'u
+    check: get_datasize_lut(EPOCH_LENGTH)     == 1082130304'u
+    check: get_datasize_lut(EPOCH_LENGTH + 1) == 1082130304'u
+    check: get_datasize_lut(EPOCH_LENGTH * 2046) == 18236833408'u
+    check: get_datasize_lut(EPOCH_LENGTH * 2047) == 18245220736'u
 
   test "Cache size at the change of epochs - Look-up tables":
-    check: get_cache_size_lut(EPOCH_LENGTH - 1) == 16776896'u
-    check: get_cache_size_lut(EPOCH_LENGTH)     == 16907456'u
-    check: get_cache_size_lut(EPOCH_LENGTH + 1) == 16907456'u
-    check: get_cache_size_lut(EPOCH_LENGTH * 2046) == 284950208'u
-    check: get_cache_size_lut(EPOCH_LENGTH * 2047) == 285081536'u
-    check: get_cache_size_lut(EPOCH_LENGTH * 2048 - 1) == 285081536'u
+    check: get_cachesize_lut(EPOCH_LENGTH - 1) == 16776896'u
+    check: get_cachesize_lut(EPOCH_LENGTH)     == 16907456'u
+    check: get_cachesize_lut(EPOCH_LENGTH + 1) == 16907456'u
+    check: get_cachesize_lut(EPOCH_LENGTH * 2046) == 284950208'u
+    check: get_cachesize_lut(EPOCH_LENGTH * 2047) == 285081536'u
+    check: get_cachesize_lut(EPOCH_LENGTH * 2048 - 1) == 285081536'u
 
   test "Random testing of full size":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/python/test_pyethash.py#L23-L28
@@ -191,13 +191,13 @@ suite "Real blocks test":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/test/c/test.cpp#L603-L617
     # POC-9 testnet, epoch 0
     let blck = 22'u # block number
-    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let cache = mkcache(get_cache_size(blck), get_seedhash(blck))
     let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("372eca2454ead349c3df0ab5d00b0b706b23e49d469387db91811cee0358fc6d")
     )
 
     let light = hashimoto_light(
-      get_datasize(blck),
+      get_data_size(blck),
       cache,
       header,
       0x495732e0ed7a801c'u
@@ -206,7 +206,7 @@ suite "Real blocks test":
     check: light.value == cast[MDigest[256]](
       hexToByteArrayBE[32]("00000b184f1fdd88bfd94c86c39e65db0c36144d5e43f745f722196e730cb614")
     )
-    check: light.mixDigest == cast[MDigest[256]](
+    check: light.mix_digest == cast[MDigest[256]](
       hexToByteArrayBE[32]("2f74cdeb198af0b9abe65d22d372e22fb2d474371774a9583c1cc427a07939f5")
     )
 
@@ -214,19 +214,19 @@ suite "Real blocks test":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/ethash_test.go#L63-L69
     # POC-9 testnet, epoch 1
     let blck = 30001'u # block number
-    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let cache = mkcache(get_cache_size(blck), get_seedhash(blck))
     let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("7e44356ee3441623bc72a683fd3708fdf75e971bbe294f33e539eedad4b92b34")
     )
 
     let light = hashimoto_light(
-      get_datasize(blck),
+      get_data_size(blck),
       cache,
       header,
       0x318df1c8adef7e5e'u
     )
 
-    check: light.mixDigest == cast[MDigest[256]](
+    check: light.mix_digest == cast[MDigest[256]](
       hexToByteArrayBE[32]("144b180aad09ae3c81fb07be92c8e6351b5646dda80e6844ae1b697e55ddde84")
     )
 
@@ -234,18 +234,18 @@ suite "Real blocks test":
     # https://github.com/ethereum/ethash/blob/f5f0a8b1962544d2b6f40df8e4b0d9a32faf8f8e/ethash_test.go#L70-L78
     # POC-9 testnet, epoch 2
     let blck = 60000'u # block number
-    let cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+    let cache = mkcache(get_cache_size(blck), get_seedhash(blck))
     let header = cast[MDigest[256]](
       hexToByteArrayBE[32]("5fc898f16035bf5ac9c6d9077ae1e3d5fc1ecc3c9fd5bee8bb00e810fdacbaa0")
     )
 
     let light = hashimoto_light(
-      get_datasize(blck),
+      get_data_size(blck),
       cache,
       header,
       0x50377003e5d830ca'u
     )
 
-    check: light.mixDigest == cast[MDigest[256]](
+    check: light.mix_digest == cast[MDigest[256]](
       hexToByteArrayBE[32]("ab546a5b73c452ae86dadd36f0ed83a6745226717d3798832d1b20b489e82063")
     )

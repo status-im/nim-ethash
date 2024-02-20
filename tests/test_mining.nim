@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Status Research & Development GmbH
+# Copyright (c) 2018-2024 Status Research & Development GmbH
 # Distributed under the Apache v2 License (license terms are at http://www.apache.org/licenses/LICENSE-2.0).
 
 import ../src/ethash, unittest, times, strutils, nimcrypto
@@ -11,12 +11,12 @@ suite "Test mining":
     # POC-9 testnet, epoch 0
     let
       blck = 22'u # block number
-      cache = mkcache(get_cachesize(blck), get_seedhash(blck))
+      cache = mkcache(get_cache_size(blck), get_seedhash(blck))
       header = cast[MDigest[256]](
         hexToByteArrayBE[32]("372eca2454ead349c3df0ab5d00b0b706b23e49d469387db91811cee0358fc6d")
       )
       difficulty = 132416'u64
-      full_size = get_datasize(blck)
+      full_size = get_data_size(blck)
 
     echo "\nGenerating dataset"
     var start = epochTime()

@@ -60,11 +60,11 @@ proc mulCarry(a, b: uint64): tuple[carry, unit: uint64] =
   result.unit += z0
   result.carry = (result.unit < z0).uint64 + z2 + z1 shr 32
 
-proc isValid(nonce: uint64,
-            difficulty: uint64,
-            full_size: Natural,
-            dataset: seq[MDigest[512]],
-            header: MDigest[256]): bool {.noSideEffect.}=
+func isValid(nonce: uint64,
+             difficulty: uint64,
+             full_size: Natural,
+             dataset: seq[MDigest[512]],
+             header: MDigest[256]): bool =
   # Boundary is 2^256/difficulty
   # A valid nonce will have: hashimoto < 2^256/difficulty
   # We can't represent 2^256 as an uint256 so as a workaround we use:
