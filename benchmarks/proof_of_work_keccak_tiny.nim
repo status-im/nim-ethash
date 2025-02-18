@@ -170,7 +170,7 @@ template hashimoto(header: Hash[256],
   littleEndian64(addr nonceLE, unsafeAddr nonce)
   s_bytes[][32..<40] = cast[array[8,byte]](nonceLE)
 
-  s = keccak_512 s_bytes[][0..<40]                  # TODO: Does this allocate a seq?
+  s = keccak512 s_bytes[][0..<40]                   # TODO: Does this allocate a seq?
 
   # start the mix with replicated s
   assert MIX_BYTES div HASH_BYTES == 2
@@ -201,7 +201,7 @@ template hashimoto(header: Hash[256],
   var concat{.noinit.}: array[64 + 32, byte]
   concat[0..<64] = s_bytes[]
   concat[64..<96] = cast[array[32, byte]](result.mix_digest)
-  result.value = keccak_256(concat)
+  result.value = keccak256(concat)
 
 func hashimoto_light*(full_size:Natural, cache: seq[Hash[512]],
                       header: Hash[256], nonce: uint64): HashimotoHash =

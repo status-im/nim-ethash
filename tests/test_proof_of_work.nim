@@ -20,7 +20,7 @@ suite "Base hashing algorithm":
       input = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       expected = "2b5ddf6f4d21c23de216f44d5e4bdc68e044b71897837ea74c83908be7037cd7".toUpperASCII
       actual = toUpperASCII($keccak256.digest(input)) # using keccak built-in conversion proc
-      actual2 = cast[array[256 div 8, byte]](keccak_256.digest(input)).toHex.toUpperAscii
+      actual2 = cast[array[256 div 8, byte]](keccak256.digest(input)).toHex.toUpperAscii
 
     check: expected == actual
     check: expected == actual2
@@ -31,7 +31,7 @@ suite "Base hashing algorithm":
       input = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       expected = "0be8a1d334b4655fe58c6b38789f984bb13225684e86b20517a55ab2386c7b61c306f25e0627c60064cecd6d80cd67a82b3890bd1289b7ceb473aad56a359405".toUpperASCII
       actual = toUpperASCII($keccak512.digest(input)) # using keccak built-in conversion proc
-      actual2 = cast[array[512 div 8, byte]](keccak_512.digest(input)).toHex.toUpperAscii
+      actual2 = cast[array[512 div 8, byte]](keccak512.digest(input)).toHex.toUpperAscii
 
     check: expected == actual
     check: expected == actual2
@@ -137,7 +137,7 @@ suite "Seed hash":
     var expected: MDigest[256]
     for i in countup(0'u32, 30000 * 2048, 30000):
       check: get_seedhash(i) == expected
-      expected = keccak_256.digest(expected.data)
+      expected = keccak256.digest(expected.data)
 
 suite "Dagger hashimoto computation":
     # We can't replicate Python's dynamic typing here
